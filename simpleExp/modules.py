@@ -11,6 +11,7 @@ class Block(nn.Module):
         super(Block, self).__init__()
         if bType == "ID":
             self.op = nn.Identity()
+            norm = False
         elif bType == "CONV1":
             self.op = nn.Conv2d(in_channels, out_channels, 1)
         elif bType == "CONV3":
@@ -24,25 +25,27 @@ class Block(nn.Module):
             self.norm = nn.BatchNorm2d(out_channels)
         else:
             self.norm = nn.Identity()
+        self.drop = nn.Dropout(p = 0.3)
         
         
 
     def forward(self, x):
 
-        return self.act(self.norm(self.op(x)))
+        return self.norm(self.act(self.op(x)))
 
 class MixedBlock(nn.Module):
-    def __init__(self, modules:list, in_channels, out_channels):
+    def __init__(self, modules:list, in_channels:int, out_channels:int, norm = False):
         super(MixedBlock, self).__init__()
         moduleList = []
         for m in modules:
-            moduleList.append(Block(m, in_channels, out_channels))
+            moduleList.append(Block(m, in_channels, out_channels, norm))
         self.moduleList = nn.ModuleList(moduleList)
         self.mix = nn.Parameter(torch.Tensor(len(modules))).requires_grad_()
-        self.sm = nn.Softmax(dim=0)
+        self.sm = nn.Softmax(dim=-1)
         
 
     def forward(self, x):
+        # return self.moduleList[0](x)
         p = self.sm(self.mix)
 #         print(p)
         output = p[0] * self.moduleList[0](x)
@@ -50,18 +53,24 @@ class MixedBlock(nn.Module):
             output += p[i] * self.moduleList[i](x)
         return output
     
+    def superEval(self, x):
+        i = self.mix.argmax()
+        return self.moduleList[i](x)
+    
 class SuperNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperNet, self).__init__()
-        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        self.block1 = MixedBlock(modules, 3, 128)
-        self.block2 = MixedBlock(modules, 128, 128)
-        self.block3 = MixedBlock(modules, 128, 256)
-        self.block4 = MixedBlock(modules, 256, 256)
-        self.block5 = MixedBlock(modules, 256, 512)
-        self.block6 = MixedBlock(modules, 512, 512)
+        # modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        modules = ["CONV1","CONV3", "CONV5"]
+        norm = True
+        self.block1 = MixedBlock(modules, 3, 128, norm)
+        self.block2 = MixedBlock(modules, 128, 128, norm)
+        self.block3 = MixedBlock(modules, 128, 256, norm)
+        self.block4 = MixedBlock(modules, 256, 256, norm)
+        self.block5 = MixedBlock(modules, 256, 512, norm)
+        self.block6 = MixedBlock(modules, 512, 512, norm)
         self.pool = nn.MaxPool2d(2)
-        self.lastPool = nn.AdaptiveAvgPool2d((4,4))
+        self.lastPool = nn.MaxPool2d(2)
         self.classifier = nn.Sequential(
             nn.Linear(512*4*4, 1024),
             nn.ReLU(),
@@ -80,3 +89,18 @@ class SuperNet(nn.Module):
         x = self.lastPool(x)
         x = self.classifier(x.view(-1, 512*4*4))
         return x
+    
+    def superEval(self, x):
+        x = self.block1.superEval(x)
+        x = self.block2.superEval(x)
+        x = self.pool(x)
+        x = self.block3.superEval(x)
+        x = self.block4.superEval(x)
+        x = self.pool(x)
+        x = self.block5.superEval(x)
+        x = self.block6.superEval(x)
+        x = self.lastPool(x)
+        x = self.classifier(x.view(-1, 512*4*4))
+        return x
+
+        
