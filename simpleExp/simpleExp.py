@@ -73,9 +73,9 @@ else:
 transform = transforms.Compose(
 [transforms.ToTensor(),
  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-trainset = torchvision.datasets.CIFAR10(root='~/testCode/data', train=True, download=True, transform=transform)
+trainset = torchvision.datasets.CIFAR10(root='/dataset', train=True, download=True, transform=transform)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batchSize, shuffle=True, num_workers=4)
-testset = torchvision.datasets.CIFAR10(root='~/testCode/data', train=False, download=True, transform=transform)
+testset = torchvision.datasets.CIFAR10(root='/dataset', train=False, download=True, transform=transform)
 testloader = torch.utils.data.DataLoader(testset, batch_size=batchSize, shuffle=False, num_workers=4)
 
 
