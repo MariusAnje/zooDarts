@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from utils import getArchParams, getNetParams
 # tqdm is imported for better visualization
 from tqdm import tqdm
 
@@ -163,10 +164,12 @@ if __name__ == "__main__":
     if offline:
         # Offline training
 
+        arch_params = getArchParams(net)
+        net_params  = getNetParams(net)
         # loss function and optimizer
         criterion = nn.CrossEntropyLoss()
         # optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-        optimizer = optim.Adam(net.parameters(), lr=0.001)
+        optimizer = optim.Adam(net_params, lr=0.001)
 
         # Training
         train(30, device)
