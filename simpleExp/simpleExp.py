@@ -9,6 +9,7 @@ from utils import getArchParams, getNetParams, archSTD
 from tqdm import tqdm
 from modules import *
 import logging
+import argparse
 
 def train(numEpoch, device):
     """
@@ -63,9 +64,9 @@ def train(numEpoch, device):
         super = superEval(device)
         # print(arch_params)
         logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, std: {running_std/(i+1):.4f}, test: {acc:.4f}, supper: {super:.4f}")
-        if acc > best_Acc:
-            best_Acc = acc
-            torch.save(net.state_dict(), './CIFAR10.pt')
+        if super > best_Acc:
+            best_Acc = super
+            torch.save(net.state_dict(), './CIFAR10_super.pt')
 
 def test(device):
     """
@@ -125,7 +126,8 @@ def warmUp(numEpoch, device):
         if acc > best_Acc:
             best_Acc = acc
             torch.save(net.state_dict(), './CIFAR10_warmed.pt')
-    
+    state_dict = torch.load('./CIFAR10_warmed.pt')
+    net.load_state_dict(state_dict)
     logging.info("train params")
     for epoch in range(numEpoch):  # loop over the dataset multiple times
 
@@ -156,6 +158,7 @@ def warmUp(numEpoch, device):
         super = superEval(device)
         # print(arch_params)
         logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, std: {running_std/(i+1):.4f}, supper: {super:.4f}")
+    torch.save(net.state_dict(), './CIFAR10_warmed.pt')
 
 
 def superEval(device):
@@ -174,12 +177,24 @@ def superEval(device):
     return correct/total
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='PyTorch Classification Training')
+
+    parser.add_argument('--test_only', action="store_true")
+    parser.add_argument('--warmed', action="store_true")
+    parser.add_argument('--warm_epochs', action="store", type = int, default = 10)
+    parser.add_argument('--train_epochs', action="store", type = int, default = 30)
+    parser.add_argument('--log_filename', action="store", type = str, default = "log")
+    args = parser.parse_args()
+    
+    
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[
-        logging.FileHandler("log", mode = "a+"),
+        logging.FileHandler("args.log_filename", mode = "a+"),
         logging.StreamHandler()
     ])
     # Determining the use scheme
-    offline = True
+    offline = not args.test_only
+    warmed  = args.warmed
 
     # Hyper parameters for training offline and inference online
     batchSize = 64
@@ -190,9 +205,9 @@ if __name__ == "__main__":
     [transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     trainset = torchvision.datasets.CIFAR10(root='/dataset/CIFAR10', train=True, download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batchSize, shuffle=True, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batchSize, shuffle=True, num_workers=8)
     testset = torchvision.datasets.CIFAR10(root='/dataset/CIFAR10', train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batchSize, shuffle=False, num_workers=4)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batchSize, shuffle=False, num_workers=8)
 
     # model
     # net = StupidNet()
@@ -215,21 +230,27 @@ if __name__ == "__main__":
         arch_opt  = optim.Adam(arch_params, lr=0.001)
 
         # Training
-        warmUp(10, device)
-        train(30, device)
+        if not warmed:
+            warmUp(args.warm_epochs, device)
+            train(args.train_epochs, device)
+        else:
+            state_dict = torch.load('./CIFAR10_warmed.pt')
+            net.load_state_dict(state_dict)
+            train(args.train_epochs, device)
 
         # Validation
-        state_dict = torch.load("./CIFAR10.pt")
+        state_dict = torch.load("./CIFAR10_super.pt")
         net.load_state_dict(state_dict)
         logging.info(f"Test accuracy: {test(device)}")
+        logging.info(f"Super accuracy: {superEval(device)}")
 
     else:
         # Online inference
 
         # The pretrained model
-        state_dict = torch.load("./CIFAR10.pt")
+        state_dict = torch.load("./CIFAR10_super.pt")
         net.load_state_dict(state_dict)
 
         # Actual inference
         print(f"Test accuracy: {test(device)}")
-        print(f"Test accuracy: {superEval(device)}")
+        print(f"Super accuracy: {superEval(device)}")

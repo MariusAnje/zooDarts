@@ -103,4 +103,41 @@ class SuperNet(nn.Module):
         x = self.classifier(x.view(-1, 512*4*4))
         return x
 
+class OriNet(nn.Module):
+    def __init__(self, num_classes = 10):
+        super(OriNet, self).__init__()
+        
+        self.feature = nn.Sequential(
+            nn.Conv2d(3, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2),
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 256, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
+            nn.MaxPool2d(2),
+            nn.Conv2d(256, 512, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.Conv2d(512, 512, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(2),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(512*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.feature(x)
+        x = self.classifier(x.view(-1, 512*4*4))
+        return x
         
