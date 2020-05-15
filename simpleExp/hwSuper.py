@@ -100,6 +100,7 @@ if __name__ == "__main__":
     model_used = HWnet
     state_dict = transfer_from_ori(model_used, args.ori_filename)
     net = model_used()
+    net.load_state_dict(state_dict)
     # print(net.state_dict().keys())
     # exit()
     net.to(device)
@@ -113,6 +114,7 @@ if __name__ == "__main__":
         # optimizer = optim.Adam(net.parameters(), lr=0.001)
         optimizer = optim.Adam(getArchParams(net, HWMixedBlock), lr=0.001)
 
+        logging.info(f"Before training, test accuracy: {test(device)}")
         # Training
         train(args.train_epochs, device)
 
