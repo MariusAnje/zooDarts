@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from modules import *
 
-def getArchParams(net):
+def getArchParams(net, MixedBlock = MixedBlock):
     arch_Params = []
     for m in net.modules():
         if isinstance(m, MixedBlock):

@@ -7,7 +7,7 @@ import torch.optim as optim
 # tqdm is imported for better visualization
 from tqdm import tqdm
 from utils import *
-from hwModule import HWnet
+from hwModule import HWnet, HWMixedBlock
 import logging
 import argparse
 
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss()
         # optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
         # optimizer = optim.Adam(net.parameters(), lr=0.001)
-        optimizer = optim.Adam(getArchParams(net), lr=0.001)
+        optimizer = optim.Adam(getArchParams(net, HWMixedBlock), lr=0.001)
 
         # Training
         train(args.train_epochs, device)
