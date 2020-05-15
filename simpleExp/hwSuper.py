@@ -40,7 +40,7 @@ def train(numEpoch, device):
                 running_loss += loss.item()
                 loader.set_description(f"{running_loss/(i+1):.4f}")
         acc = test(device)
-        print(f"Epoch {epoch}: test accuracy: {acc:.4f}")
+        logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, test: {acc:.4f}")
         if acc > best_Acc:
             best_Acc = acc
             torch.save(net.state_dict(), './MIX.pt')
@@ -131,4 +131,4 @@ if __name__ == "__main__":
         net.load_state_dict(state_dict)
 
         # Actual inference
-        print(f"Test accuracy: {test(device)}")
+        logging.info(f"Test accuracy: {test(device)}")
