@@ -75,7 +75,7 @@ if __name__ == "__main__":
     
     
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(message)s", handlers=[
-        logging.FileHandler("args.log_filename", mode = "a+"),
+        logging.FileHandler(args.log_filename, mode = "a+"),
         logging.StreamHandler()
     ])
     # Determining the use scheme
