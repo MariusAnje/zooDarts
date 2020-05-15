@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from modules import Block
 
 class HWMixedBlock(nn.Module):
     def __init__(self, in_channels:int, out_channels:int, norm:bool):
