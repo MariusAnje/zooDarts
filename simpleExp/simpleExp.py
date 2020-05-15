@@ -14,6 +14,7 @@ def train(numEpoch, device):
     """
         Typical training scheme for offline training.
     """
+    logging.info("training")
     net.train()
     best_Acc = 0.0
     for epoch in range(numEpoch):  # loop over the dataset multiple times
@@ -36,7 +37,8 @@ def train(numEpoch, device):
                 totalLoss = std + loss 
                 totalLoss.backward()
                 optimizer.step()
-                if i % 5 == 4: 
+                arch_interval = 1
+                if i % arch_interval == arch_interval - 1: 
                     arch_opt.zero_grad()
                     searchData = next(iter(trainloader))
                     inputs, labels = data
@@ -82,6 +84,79 @@ def test(device):
             correct += (predicted == labels).sum().item()
 
     return correct/total
+
+def warmUp(numEpoch, device):
+    """
+        Typical training scheme for offline training.
+    """
+    logging.info("warming up")
+    net.train()
+    best_Acc = 0.0
+    logging.info("train network")
+    for epoch in range(numEpoch):  # loop over the dataset multiple times
+
+        running_loss = 0.0
+        running_std  = 0.0
+        with tqdm(trainloader, leave = False) as loader:
+            for i, data in enumerate(loader, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(inputs)
+                std = archSTD(arch_params)
+                loss = criterion(outputs, labels)
+                totalLoss = std + loss 
+                totalLoss.backward()
+                optimizer.step()
+
+                # print statistics
+                running_loss += loss.item()
+                running_std  += std.item()
+                loader.set_description(f"{running_loss/(i+1):.4f}, {running_std/(i+1):.4f}")
+        acc = test(device)
+        super = 0
+        # print(arch_params)
+        logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, std: {running_std/(i+1):.4f}, test: {acc:.4f}")
+        if acc > best_Acc:
+            best_Acc = acc
+            torch.save(net.state_dict(), './CIFAR10_warmed.pt')
+    
+    logging.info("train params")
+    for epoch in range(numEpoch):  # loop over the dataset multiple times
+
+        running_loss = 0.0
+        running_std  = 0.0
+        with tqdm(trainloader, leave = False) as loader:
+            for i, data in enumerate(loader, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+
+                # zero the parameter gradients
+                arch_opt.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(inputs)
+                std = archSTD(arch_params)
+                loss = criterion(outputs, labels)
+                totalLoss = std + loss 
+                totalLoss.backward()
+                arch_opt.step()
+
+                # print statistics
+                running_loss += loss.item()
+                running_std  += std.item()
+                loader.set_description(f"{running_loss/(i+1):.4f}, {running_std/(i+1):.4f}")
+
+        super = superEval(device)
+        # print(arch_params)
+        logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, std: {running_std/(i+1):.4f}, supper: {super:.4f}")
+
 
 def superEval(device):
     correct = 0
@@ -140,6 +215,7 @@ if __name__ == "__main__":
         arch_opt  = optim.Adam(arch_params, lr=0.001)
 
         # Training
+        warmUp(10, device)
         train(30, device)
 
         # Validation

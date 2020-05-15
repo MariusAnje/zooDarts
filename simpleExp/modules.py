@@ -40,7 +40,7 @@ class MixedBlock(nn.Module):
         for m in modules:
             moduleList.append(Block(m, in_channels, out_channels, norm))
         self.moduleList = nn.ModuleList(moduleList)
-        self.mix = nn.Parameter(torch.Tensor(len(modules))).requires_grad_()
+        self.mix = nn.Parameter(torch.ones(len(modules))).requires_grad_()
         self.sm = nn.Softmax(dim=-1)
         
 
