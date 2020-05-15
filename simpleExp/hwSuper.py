@@ -8,6 +8,8 @@ import torch.optim as optim
 from tqdm import tqdm
 from utils import *
 from hwModule import HWnet
+import logging
+import argparse
 
 
 def train(numEpoch, device):
