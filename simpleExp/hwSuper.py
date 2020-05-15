@@ -21,6 +21,7 @@ def train(numEpoch, device):
     for epoch in range(numEpoch):  # loop over the dataset multiple times
 
         running_loss = 0.0
+        running_std  = 0.0
         with tqdm(trainloader, leave = False) as loader:
             for i, data in enumerate(loader, 0):
                 # get the inputs; data is a list of [inputs, labels]

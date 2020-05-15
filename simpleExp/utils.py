@@ -38,8 +38,8 @@ def transfer_from_ori(model_type, ori_filename):
     o_keys = list(ori_state_dict.keys())
     i = 0
     j = 0
-    print(len(s_keys))
-    print(len(o_keys))
+    # print(len(s_keys))
+    # print(len(o_keys))
     while (True):
         if i == len(s_keys) or j == len(o_keys):
             break
