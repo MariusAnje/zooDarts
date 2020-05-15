@@ -32,15 +32,18 @@ def train(numEpoch, device):
 
                 # forward + backward + optimize
                 outputs = net(inputs)
+                std  = archSTD(arch_params)
                 loss = criterion(outputs, labels)
-                loss.backward()
+                tLoss = std + loss
+                tLoss.backward()
                 optimizer.step()
 
                 # print statistics
                 running_loss += loss.item()
-                loader.set_description(f"{running_loss/(i+1):.4f}")
+                running_std  += std.item()
+                loader.set_description(f"{running_loss/(i+1):.4f}, {running_std/(i+1):.4f}")
         acc = test(device)
-        logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, test: {acc:.4f}")
+        logging.info(f"Epoch {epoch}: train loss: {running_loss/(i+1):.4f}, std: {running_std/(i+1):.4f}, test: {acc:.4f}")
         if acc > best_Acc:
             best_Acc = acc
             torch.save(net.state_dict(), './MIX.pt')
@@ -112,7 +115,8 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss()
         # optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
         # optimizer = optim.Adam(net.parameters(), lr=0.001)
-        optimizer = optim.Adam(getArchParams(net, HWMixedBlock), lr=0.001)
+        arch_params = getArchParams(net, HWMixedBlock)
+        optimizer = optim.Adam(arch_params, lr=0.001)
 
         logging.info(f"Before training, test accuracy: {test(device)}")
         # Training
