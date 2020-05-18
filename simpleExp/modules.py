@@ -32,6 +32,10 @@ class Block(nn.Module):
     def forward(self, x):
 
         return self.norm(self.act(self.op(x)))
+    
+    def inference(self, x):
+        
+        return self.forward(x)
 
 class MixedBlock(nn.Module):
     def __init__(self, modules:list, in_channels:int, out_channels:int, norm = False):
