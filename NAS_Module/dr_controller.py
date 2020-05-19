@@ -44,7 +44,8 @@ class Controller(object):
         self.alpha = float(self.args.alpha)
         self.target_acc = [float(x) for x in self.args.target_acc.split(" ")]
         self.target_lat = [float(x) for x in self.args.target_lat.split(" ")]
-
+        
+        """
         [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p] = [int(x.strip()) for x in self.args.cconv.split(",")]
         self.HW = [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p]
         self.HW2 = [int(x.strip()) for x in self.args.dconv.split(",")]
@@ -55,7 +56,8 @@ class Controller(object):
         self.sess = tf.Session(config=config, graph=self.graph)
 
         self.hidden_units = controller_params['hidden_units']
-
+        """
+        
         if self.args.model == "resnet18":
             self.nn_model_helper = ss_resnet18
         elif self.args.model == "mnasnet0_5":
@@ -93,7 +95,7 @@ class Controller(object):
         #     self.para_2_val[idx] = hp
         #     idx += 1
 
-
+        """
         self.RNN_classifier = {}
         self.RNN_pred_prob = {}
         with self.graph.as_default():
@@ -108,7 +110,7 @@ class Controller(object):
         self.target_HW_Eff = HW_constraints["target_HW_Eff"]
 
         self.pattern_space = pattern_sets_generate_3((3,3))
-
+        """
 
 
     def build_controller(self):
@@ -261,16 +263,47 @@ class Controller(object):
 
     def global_train(self):
         import torchvision
+        from dr_utils import make_mixed
+        from torch import nn
+        
+        """
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
+        """
         step = 0
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
-
+        device = torch.device("cuda:0")
         space = self.nn1_search_space
         model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
-        print(list(model.named_modules()))
-        exit()
+        i = 0
+        """
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                make_mixed(model, module, name, 3)
+                i += 1
+        """
+
+        model.to(device)
+        import torch.optim as optim
+        # optimizer = optim.Adam(model.parameters(), lr = 0.01)
+        # criterion = nn.CrossEntropyLoss()
+        from tqdm import tqdm
+        correct = 0
+        total = 0
+        ct = 0
+        for inputs, labels in tqdm(self.data_loader_test):
+            inputs, labels = inputs.to(device), labels.to(device)
+            #optimizer.zero_grad()
+            outputs = model(inputs)
+            #loss = criterion(outputs, labels)
+            #loss.backward()
+            #optimizer.step()
+            predicted = torch.argmax(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        print(f"{correct}, {total}, {ct}, acc: {correct/total}")
+        exit(0)
 
         for episode in range(controller_params['max_episodes']):
             logger.info(
