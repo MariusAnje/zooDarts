@@ -260,6 +260,7 @@ class Controller(object):
         return HW1, RC
 
     def global_train(self):
+        import torchvision
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
         step = 0
