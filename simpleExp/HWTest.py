@@ -85,7 +85,7 @@ def batched_simple_test():
             t_index = a.sum(dim = 0).argmin()
             # print(f"GT = {GT.numpy()}, index = {t_index.numpy()}")
             model = BatchedMixedBlock(a.size(1))
-            optimizer = optim.SGD(model.parameters(), lr=0.001)
+            optimizer = optim.Adam(model.parameters(), lr=0.001)
             criterion = nn.MSELoss()
             # loader = tqdm(range(100000),leave=False, mininterval=0.1,)
             loader = range(100)
