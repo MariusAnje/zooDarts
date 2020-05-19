@@ -70,9 +70,6 @@ class Controller(object):
         
         space_name = self.nn_model_helper.get_space()[0]
         space = self.nn_model_helper.get_space()[1]
-        print(space_name)
-        print(space)
-        exit(0)
 
         self.nn1_search_space = space
         # self.hw1_search_space = controller_params['hw_space']
@@ -269,6 +266,10 @@ class Controller(object):
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
 
+        space = self.nn1_search_space
+        model = torchvision.models.__dict__[args.model](pretrained=args.pretrained)
+        print(list(model.named_modules()))
+
         for episode in range(controller_params['max_episodes']):
             logger.info(
                 '=-=-==-=-==-=-==-=-==-=-==-=-==-=-=>Episode {}<=-=-==-=-==-=-==-=-==-=-==-=-==-=-='.format(episode))
@@ -304,89 +305,27 @@ class Controller(object):
                                                                                                 episode,
                                                                                                 hyperparameters))
 
-                if str_NNs in self.explored_info.keys():
-                    accuracy = self.explored_info[str_NNs][0]
-                    reward = self.explored_info[str_NNs][1]
-                    # HW_Eff = self.explored_info[str_NNs][2]
-
-                else:
-
-                    Network = self.para2interface_NN(Para_NN1)
-                    # HW1, RC = self.para2interface_HW(Para_HW1)
-                    # HW_Eff = self.get_HW_efficienct(Network, HW1, RC)
-
-                    # HW Efficiency
-
-                    # logger.info('------>Hardware Efficiency Exploreation {}<------'.format(HW_Eff))
-                    # # Dec. 22: Second loop: search hardware
-                    # # HW_Eff == -1 indicates that violate the resource constriants
-                    # if HW_Eff == -1 or HW_Eff > self.target_HW_Eff:
-                    #     for i in range(controller_params["num_hw_per_child"]):
-                    #         child_network, hyperparameters = self.generate_child_network(child_network)
-                    #         l_Para_HW1 = hyperparameters[0][self.hw1_beg:self.hw1_end]
-                    #
-                    #         str_HW1 = " ".join(str(x) for x in l_Para_HW1)
-                    #         str_HWs = str_HW1
-                    #         DNA_HW1 = child_network[0][self.hw1_beg:self.hw1_end]
-                    #
-                    #         HW1, RC = self.para2interface_HW(Para_HW1)
-                    #         HW_Eff = self.get_HW_efficienct(Network, HW1, RC)
-                    #
-                    #         if HW_Eff != -1:
-                    #             logger.info('------>Hardware Exploreation  Success<------')
-                    #             break
-                    # else:
-                    #     logger.info('------>No Need for Hardware Exploreation<------')
-
-                    if True:
-
-                        if str_NNs in self.trained_network.keys():
-                            (acc1,acc5,lat) = self.trained_network[str_NNs]
-                        else:
-                            # comment: train network and obtain accuracy for updating controller
-                            # acc1 = random.uniform(0, 1)
-                            # acc5 = random.uniform(0, 1)
-                            # lat = random.uniform(7, 10)
-
-                            acc1,acc5,lat = train.main(self.args, Para_NN1, self.HW, self.data_loader, \
-                                                       self.data_loader_test,self.HW2)
-
-                            # Keep history trained data
-
-                            self.trained_network[str_NNs] = (acc1,acc5,lat)
-
-                        # norm_HW_Eff = (self.target_HW_Eff - HW_Eff) / self.target_HW_Eff
-                        # Weiwen 01-24: Set weight of HW Eff to 1 for hardware exploration only
+                acc1,acc5,loss, lat = train.main(self.args, Para_NN1, self.HW, self.data_loader, \
+                                            self.data_loader_test,self.HW2)
 
 
-                        if acc5>self.target_acc[1]:
-                            acc_reward = 1
-                        elif acc5<self.target_acc[0]:
-                            acc_reward = -1
-                        else:
-                            acc_reward = (acc5-self.target_acc[0])/(self.target_acc[1]-self.target_acc[0])*2-1
+                # if acc5>self.target_acc[1]:
+                #     acc_reward = 1
+                # elif acc5<self.target_acc[0]:
+                #     acc_reward = -1
+                # else:
+                #     acc_reward = (acc5-self.target_acc[0])/(self.target_acc[1]-self.target_acc[0])*2-1
 
-                        if lat==-1:
-                            lat_reward = -1
-                        elif lat>self.target_lat[1]:
-                            lat_reward = -1
-                        elif lat<self.target_lat[0]:
-                            lat_reward = 1
-                        else:
-                            lat_reward = (self.target_lat[1]-lat)/(self.target_lat[1]-self.target_lat[0])*2-1
+                # if lat==-1:
+                #     lat_reward = -1
+                # elif lat>self.target_lat[1]:
+                #     lat_reward = -1
+                # elif lat<self.target_lat[0]:
+                #     lat_reward = 1
+                # else:
+                #     lat_reward = (self.target_lat[1]-lat)/(self.target_lat[1]-self.target_lat[0])*2-1
 
-                        reward = acc_reward * self.alpha + lat_reward*(1-self.alpha)
-
-
-                        #
-                        # reward = float(acc1)
-
-                        # Help us to build the history table to avoid optimization for the same network
-                        # Weiwen 01-24: We comment this for exploration of hardware
-                        # self.explored_info[str_NNs] = {}
-                        # self.explored_info[str_NNs][0] = accuracy
-                        # self.explored_info[str_NNs][1] = reward
-                        # self.explored_info[str_NNs][2] = HW_Eff
+                reward = loss * self.alpha + lat*(1-self.alpha)
 
 
 
