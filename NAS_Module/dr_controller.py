@@ -268,7 +268,7 @@ class Controller(object):
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
 
         space = self.nn1_search_space
-        model = torchvision.models.__dict__[args.model](pretrained=args.pretrained)
+        model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
         print(list(model.named_modules()))
         exit()
 
