@@ -269,6 +269,7 @@ class Controller(object):
         space = self.nn1_search_space
         model = torchvision.models.__dict__[args.model](pretrained=args.pretrained)
         print(list(model.named_modules()))
+        exit()
 
         for episode in range(controller_params['max_episodes']):
             logger.info(
