@@ -48,13 +48,13 @@ class Controller(object):
         [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p] = [int(x.strip()) for x in self.args.cconv.split(",")]
         self.HW = [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p]
         self.HW2 = [int(x.strip()) for x in self.args.dconv.split(",")]
-        # self.graph = tf.Graph()
+        self.graph = tf.Graph()
 
-        # config = tf.ConfigProto()
-        # config.gpu_options.allow_growth = True
-        # self.sess = tf.Session(config=config, graph=self.graph)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.sess = tf.Session(config=config, graph=self.graph)
 
-        # self.hidden_units = controller_params['hidden_units']
+        self.hidden_units = controller_params['hidden_units']
 
         if self.args.model == "resnet18":
             self.nn_model_helper = ss_resnet18
