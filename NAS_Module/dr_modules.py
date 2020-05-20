@@ -49,9 +49,22 @@ class MixedBlock(nn.Module):
                 if B:
                     new_conv.bias.data = module.bias.data
                 moduleList.append(new_conv)
+        elif isinstance(module, nn.BatchNorm2d):
+            moduleList = []
+            new_bn = nn.BatchNorm2d(module.num_features)
+            new_bn.weight.data = module.weight.data
+            new_bn.bias.data = module.bias.data
+            new_bn.running_mean.data = module.running_mean.data
+            new_bn.running_var.data = module.running_var.data 
+            new_bn.num_batches_tracked.data = module.num_batches_tracked.data
+            new_bn.eval()
+            moduleList.append(new_bn)
         else:
             moduleList = []
-            moduleList.append(module)
+            new_thing = module
+            new_thing.weight.data = module.weight.data
+            new_thing.bias.data = module.bias.data
+            moduleList.append(new_thing)
         self.moduleList = nn.ModuleList(moduleList)
         self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
         self.sm = nn.Softmax(dim=-1)

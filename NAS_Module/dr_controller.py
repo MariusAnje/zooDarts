@@ -127,16 +127,18 @@ class Controller(object):
         device = torch.device("cuda:1")
         dna = self.nn1_search_space
         model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
-        i = 0
 
         pattern_idx, k_expand, ch_list, q_list, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
         layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras \
             = self.nn_model_helper.resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, self.args)
         
-        print(layer_kernel_inc)
-        print(channel_cut_layers)
-        print(quant_layers)
+        model.train()
+        # print(layer_kernel_inc)
+        # print(channel_cut_layers)
+        # print(quant_layers)
         module_dict = dict(model.named_modules())
+        
+        print(module_dict["layer1.0.bn1"].state_dict()["running_mean"][0], module_dict["layer1.0.bn1"].state_dict()["running_var"][0], module_dict["layer1.0.bn1"].state_dict()["weight"][0])
         
         # Kernel Pattern layers
         for name in layer_names:
@@ -151,6 +153,8 @@ class Controller(object):
             make_mixed(model, module_dict[name], name, len(quan_paras[name][1]))
 
         model.to(device)
+        print(module_dict["layer1.0.bn1"].state_dict()["running_mean"][0], module_dict["layer1.0.bn1"].state_dict()["running_var"][0], module_dict["layer1.0.bn1"].state_dict()["weight"][0])
+
         import torch.optim as optim
         # optimizer = optim.Adam(model.parameters(), lr = 0.01)
         # criterion = nn.CrossEntropyLoss()
@@ -159,7 +163,9 @@ class Controller(object):
         total = 0
         ct = 0
         model.eval()
-        for inputs, labels in tqdm(self.data_loader_test):
+        loader = tqdm(self.data_loader_test)
+        c = 0
+        for inputs, labels in loader:
             inputs, labels = inputs.to(device), labels.to(device)
             #optimizer.zero_grad()
             outputs = model(inputs)
@@ -169,7 +175,12 @@ class Controller(object):
             predicted = torch.argmax(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            loader.set_description(f"{correct}, {total}")
+            c += 1
+            if c == 10:
+                break
         print(f"{correct}, {total}, {ct}, acc: {correct/total}")
+        print(module_dict["layer1.0.bn1"].state_dict()["running_mean"][0], module_dict["layer1.0.bn1"].state_dict()["running_var"][0], module_dict["layer1.0.bn1"].state_dict()["weight"][0])
         exit(0)
 
         for episode in range(controller_params['max_episodes']):
