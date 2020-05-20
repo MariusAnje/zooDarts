@@ -153,7 +153,7 @@ class Controller(object):
             make_mixed(model, module_dict[name], name, len(quan_paras[name][1]))
 
         model.to(device)
-        module_dict = dict(model.named_modules())
+        # module_dict = dict(model.named_modules())
         print(module_dict["layer1.0.bn1"].state_dict()["running_mean"][0], module_dict["layer1.0.bn1"].state_dict()["running_var"][0], module_dict["layer1.0.bn1"].state_dict()["weight"][0])
 
         import torch.optim as optim
