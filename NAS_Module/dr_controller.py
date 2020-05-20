@@ -273,16 +273,16 @@ class Controller(object):
         step = 0
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
-        device = torch.device("cuda:0")
+        device = torch.device("cuda:1")
         space = self.nn1_search_space
+        print(space)
+        exit()
         model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
         i = 0
-        """
         for name, module in model.named_modules():
             if isinstance(module, torch.nn.Conv2d):
                 make_mixed(model, module, name, 3)
                 i += 1
-        """
 
         model.to(device)
         import torch.optim as optim
@@ -292,6 +292,7 @@ class Controller(object):
         correct = 0
         total = 0
         ct = 0
+        model.eval()
         for inputs, labels in tqdm(self.data_loader_test):
             inputs, labels = inputs.to(device), labels.to(device)
             #optimizer.zero_grad()
