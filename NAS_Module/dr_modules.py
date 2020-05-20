@@ -53,7 +53,7 @@ class MixedBlock(nn.Module):
             ch = module.num_features
             [eps, momentum, affine, track_running_stats] = (module.eps, module.momentum, module.affine, module.track_running_stats)
             moduleList = []
-            for _ in range(module_num):
+            for _ in range(1):
                 new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
                 new_bn.weight.data = module.weight.data
                 new_bn.bias.data = module.bias.data
