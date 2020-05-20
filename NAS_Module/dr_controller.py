@@ -3,7 +3,7 @@
 import logging
 import csv
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
 import sys
 from rl_input import controller_params, HW_constraints
 import termplotlib as tpl
@@ -112,155 +112,6 @@ class Controller(object):
         self.pattern_space = pattern_sets_generate_3((3,3))
         """
 
-
-    def build_controller(self):
-        logger.info('Building RNN Network')
-        # Build inputs and placeholders
-        with tf.name_scope('controller_inputs'):
-            # Input to the NASCell
-            self.child_network_paras = tf.placeholder(tf.int64, [None, self.num_para], name='controller_input')
-            # Discounted rewards
-            self.discounted_rewards = tf.placeholder(tf.float32, (None,), name='discounted_rewards')
-            # WW 12-18: input: the batch_size variable will be used to determine the RNN batch
-            self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
-
-        with tf.name_scope('embedding'):
-            self.embedding_weights = []
-            # share embedding weights for each type of parameters
-            embedding_id = 0
-            para_2_emb_id = {}
-            for i in range(len(self.para_2_val.keys())):
-                additional_para_size = len(self.para_2_val[i])
-                additional_para_weights = tf.get_variable('state_embeddings_%d' % (embedding_id),
-                                                          shape=[additional_para_size, self.hidden_units],
-                                                          initializer=tf.initializers.random_uniform(-1., 1.))
-                self.embedding_weights.append(additional_para_weights)
-                para_2_emb_id[i] = embedding_id
-                embedding_id += 1
-
-            self.embedded_input_list = []
-            for i in range(self.num_para):
-                self.embedded_input_list.append(
-                    tf.nn.embedding_lookup(self.embedding_weights[para_2_emb_id[i]], self.child_network_paras[:, i]))
-            self.embedded_input = tf.stack(self.embedded_input_list, axis=-1)
-            self.embedded_input = tf.transpose(self.embedded_input, perm=[0, 2, 1])
-
-        logger.info('Building Controller')
-        with tf.name_scope('controller'):
-            with tf.variable_scope('RNN'):
-                nas = tf.contrib.rnn.NASCell(self.hidden_units)
-                tmp_state = nas.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-                init_state = tf.nn.rnn_cell.LSTMStateTuple(tmp_state[0], tmp_state[1])
-
-                output, final_state = tf.nn.dynamic_rnn(nas, self.embedded_input, initial_state=init_state,
-                                                        dtype=tf.float32)
-                tmp_list = []
-                # print("output","="*50,output)
-                # print("output slice","="*50,output[:,-1,:])
-                for para_idx in range(self.num_para):
-                    o = output[:, para_idx, :]
-                    para_len = len(self.para_2_val[para_idx])
-                    # len(self.para_val[para_idx % self.para_per_layer])
-                    classifier = tf.layers.dense(o, units=para_len, name='classifier_%d' % (para_idx), reuse=False)
-                    self.RNN_classifier[para_idx] = classifier
-                    prob_pred = tf.nn.softmax(classifier)
-                    self.RNN_pred_prob[para_idx] = prob_pred
-                    child_para = tf.argmax(prob_pred, axis=-1)
-                    tmp_list.append(child_para)
-                self.pred_val = tf.stack(tmp_list, axis=1)
-
-        logger.info('Building Optimization')
-        # with tf.name_scope('Optimization'):
-        # Global Optimization composes all RNNs in one, like NAS, where arch_idx = 0
-
-        with tf.name_scope('Optimizer'):
-            self.global_step = tf.Variable(0, trainable=False)
-            self.learning_rate = tf.train.exponential_decay(0.99, self.global_step, 50, 0.5, staircase=True)
-            if self.args.rl_optimizer=="Adam":
-                self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
-            else:
-                self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate)
-
-        with tf.name_scope('Loss'):
-            # We seperately compute loss of each predict parameter since the dim of predicting parameters may not be same
-            for para_idx in range(self.num_para):
-                if para_idx == 0:
-                    self.policy_gradient_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                        logits=self.RNN_classifier[para_idx], labels=self.child_network_paras[:, para_idx])
-                else:
-                    self.policy_gradient_loss = tf.add(self.policy_gradient_loss,
-                                                       tf.nn.sparse_softmax_cross_entropy_with_logits(
-                                                           logits=self.RNN_classifier[para_idx],
-                                                           labels=self.child_network_paras[:, para_idx]))
-                # get mean of loss
-            self.policy_gradient_loss /= self.num_para
-            self.total_loss = self.policy_gradient_loss
-            self.gradients = self.optimizer.compute_gradients(self.total_loss)
-
-            # Gradients calculated using REINFORCE
-            for i, (grad, var) in enumerate(self.gradients):
-                if grad is not None:
-                    # print("aaa",grad)
-                    # print("aaa",self.discounted_rewards)
-                    # sys.exit(0)
-                    self.gradients[i] = (grad * self.discounted_rewards, var)
-
-        with tf.name_scope('Train_RNN'):
-            # The main training operation. This applies REINFORCE on the weights of the Controller
-            # self.train_operation[arch_idx][pip_idx] = self.optimizer[arch_idx][pip_idx].apply_gradients(self.gradients[arch_idx][pip_idx], global_step=self.global_step[arch_idx][pip_idx])
-            # self.train_operation = self.optimizer.minimize(self.total_loss)
-            self.train_operation = self.optimizer.apply_gradients(self.gradients)
-            self.update_global_step = tf.assign(self.global_step, self.global_step + 1, name='update_global_step')
-
-        logger.info('Successfully built controller')
-
-    def child_network_translate(self, child_network):
-        dnn_out = np.zeros_like(child_network)
-        for para_idx in range(self.num_para):
-            dnn_out[0][para_idx] = (self.para_2_val[para_idx][child_network[0][para_idx]])
-        return dnn_out
-
-    def generate_child_network(self, child_network_architecture):
-        with self.graph.as_default():
-            feed_dict = {
-                self.child_network_paras: child_network_architecture,
-                self.batch_size: 1
-            }
-            rnn_out = self.sess.run(self.RNN_pred_prob, feed_dict=feed_dict)
-            predict_child = np.array([[0] * self.num_para])
-            # random.seed(datetime.now())
-            for para_idx, prob in rnn_out.items():
-                predict_child[0][para_idx] = np.random.choice(range(len(self.para_2_val[para_idx])), p=prob[0])
-            hyperparameters = self.child_network_translate(predict_child)
-            return predict_child, hyperparameters
-
-    def plot_history(self, history, ylim=(-1, 1), title="reward"):
-        x = list(range(len(history)))
-        y = history
-        fig = tpl.figure()
-        fig.plot(x, y, ylim=ylim, width=60, height=20, title=title)
-        fig.show()
-
-    def get_HW_efficienct(self, Network, HW1, RC):
-        # Weiwen 01-24: Using the built Network and HW1 explored results to generate hardware efficiency
-        # with the consideration of resource constraint RC
-        return random.uniform(0, 1)
-
-    def para2interface_NN(self, Para_NN1):
-        # Weiwen 01-24: Build NN using explored hyperparamters, return Network
-        Network = -1    # func(Para_NN1)
-        return Network
-
-    def para2interface_HW(self, Para_HW1):
-        # Weiwen 01-24: Build hardware model using the explored paramters
-        HW1 = -1        # func(Para_HW1)
-        RC = [HW_constraints["r_Ports_BW"],
-              HW_constraints["r_DSP"],
-              HW_constraints["r_BRAM"],
-              HW_constraints["r_BRAM_Size"],
-              HW_constraints["BITWIDTH"]]
-        return HW1, RC
-
     def global_train(self):
         import torchvision
         from dr_utils import make_mixed
@@ -274,15 +125,30 @@ class Controller(object):
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
         device = torch.device("cuda:1")
-        space = self.nn1_search_space
-        print(space)
-        exit()
+        dna = self.nn1_search_space
         model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
         i = 0
-        for name, module in model.named_modules():
-            if isinstance(module, torch.nn.Conv2d):
-                make_mixed(model, module, name, 3)
-                i += 1
+
+        pattern_idx, k_expand, ch_list, q_list, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
+        layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras \
+            = self.nn_model_helper.resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, self.args)
+        
+        print(layer_kernel_inc)
+        print(channel_cut_layers)
+        print(quant_layers)
+        module_dict = dict(model.named_modules())
+        
+        # Kernel Pattern layers
+        for name in layer_names:
+            make_mixed(model, module_dict[name], name, 56)
+        
+        # Channel Cut
+        for item in channel_cut_layers[3:]:
+            for name in item[:3]:
+                make_mixed(model, module_dict[name], name, len(item[3][1]))
+        
+        for name in quant_layers:
+            make_mixed(model, module_dict[name], name, len(quan_paras[name][1]))
 
         model.to(device)
         import torch.optim as optim
@@ -432,7 +298,153 @@ class Controller(object):
         print(self.reward_history)
         self.plot_history(self.reward_history, ylim=(min(self.reward_history)-0.01, max(self.reward_history)-0.01))
 
+    def build_controller(self):
+        logger.info('Building RNN Network')
+        # Build inputs and placeholders
+        with tf.name_scope('controller_inputs'):
+            # Input to the NASCell
+            self.child_network_paras = tf.placeholder(tf.int64, [None, self.num_para], name='controller_input')
+            # Discounted rewards
+            self.discounted_rewards = tf.placeholder(tf.float32, (None,), name='discounted_rewards')
+            # WW 12-18: input: the batch_size variable will be used to determine the RNN batch
+            self.batch_size = tf.placeholder(tf.int32, [], name='batch_size')
 
+        with tf.name_scope('embedding'):
+            self.embedding_weights = []
+            # share embedding weights for each type of parameters
+            embedding_id = 0
+            para_2_emb_id = {}
+            for i in range(len(self.para_2_val.keys())):
+                additional_para_size = len(self.para_2_val[i])
+                additional_para_weights = tf.get_variable('state_embeddings_%d' % (embedding_id),
+                                                          shape=[additional_para_size, self.hidden_units],
+                                                          initializer=tf.initializers.random_uniform(-1., 1.))
+                self.embedding_weights.append(additional_para_weights)
+                para_2_emb_id[i] = embedding_id
+                embedding_id += 1
+
+            self.embedded_input_list = []
+            for i in range(self.num_para):
+                self.embedded_input_list.append(
+                    tf.nn.embedding_lookup(self.embedding_weights[para_2_emb_id[i]], self.child_network_paras[:, i]))
+            self.embedded_input = tf.stack(self.embedded_input_list, axis=-1)
+            self.embedded_input = tf.transpose(self.embedded_input, perm=[0, 2, 1])
+
+        logger.info('Building Controller')
+        with tf.name_scope('controller'):
+            with tf.variable_scope('RNN'):
+                nas = tf.contrib.rnn.NASCell(self.hidden_units)
+                tmp_state = nas.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+                init_state = tf.nn.rnn_cell.LSTMStateTuple(tmp_state[0], tmp_state[1])
+
+                output, final_state = tf.nn.dynamic_rnn(nas, self.embedded_input, initial_state=init_state,
+                                                        dtype=tf.float32)
+                tmp_list = []
+                # print("output","="*50,output)
+                # print("output slice","="*50,output[:,-1,:])
+                for para_idx in range(self.num_para):
+                    o = output[:, para_idx, :]
+                    para_len = len(self.para_2_val[para_idx])
+                    # len(self.para_val[para_idx % self.para_per_layer])
+                    classifier = tf.layers.dense(o, units=para_len, name='classifier_%d' % (para_idx), reuse=False)
+                    self.RNN_classifier[para_idx] = classifier
+                    prob_pred = tf.nn.softmax(classifier)
+                    self.RNN_pred_prob[para_idx] = prob_pred
+                    child_para = tf.argmax(prob_pred, axis=-1)
+                    tmp_list.append(child_para)
+                self.pred_val = tf.stack(tmp_list, axis=1)
+
+        logger.info('Building Optimization')
+        # with tf.name_scope('Optimization'):
+        # Global Optimization composes all RNNs in one, like NAS, where arch_idx = 0
+
+        with tf.name_scope('Optimizer'):
+            self.global_step = tf.Variable(0, trainable=False)
+            self.learning_rate = tf.train.exponential_decay(0.99, self.global_step, 50, 0.5, staircase=True)
+            if self.args.rl_optimizer=="Adam":
+                self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
+            else:
+                self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate)
+
+        with tf.name_scope('Loss'):
+            # We seperately compute loss of each predict parameter since the dim of predicting parameters may not be same
+            for para_idx in range(self.num_para):
+                if para_idx == 0:
+                    self.policy_gradient_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        logits=self.RNN_classifier[para_idx], labels=self.child_network_paras[:, para_idx])
+                else:
+                    self.policy_gradient_loss = tf.add(self.policy_gradient_loss,
+                                                       tf.nn.sparse_softmax_cross_entropy_with_logits(
+                                                           logits=self.RNN_classifier[para_idx],
+                                                           labels=self.child_network_paras[:, para_idx]))
+                # get mean of loss
+            self.policy_gradient_loss /= self.num_para
+            self.total_loss = self.policy_gradient_loss
+            self.gradients = self.optimizer.compute_gradients(self.total_loss)
+
+            # Gradients calculated using REINFORCE
+            for i, (grad, var) in enumerate(self.gradients):
+                if grad is not None:
+                    # print("aaa",grad)
+                    # print("aaa",self.discounted_rewards)
+                    # sys.exit(0)
+                    self.gradients[i] = (grad * self.discounted_rewards, var)
+
+        with tf.name_scope('Train_RNN'):
+            # The main training operation. This applies REINFORCE on the weights of the Controller
+            # self.train_operation[arch_idx][pip_idx] = self.optimizer[arch_idx][pip_idx].apply_gradients(self.gradients[arch_idx][pip_idx], global_step=self.global_step[arch_idx][pip_idx])
+            # self.train_operation = self.optimizer.minimize(self.total_loss)
+            self.train_operation = self.optimizer.apply_gradients(self.gradients)
+            self.update_global_step = tf.assign(self.global_step, self.global_step + 1, name='update_global_step')
+
+        logger.info('Successfully built controller')
+
+    def child_network_translate(self, child_network):
+        dnn_out = np.zeros_like(child_network)
+        for para_idx in range(self.num_para):
+            dnn_out[0][para_idx] = (self.para_2_val[para_idx][child_network[0][para_idx]])
+        return dnn_out
+
+    def generate_child_network(self, child_network_architecture):
+        with self.graph.as_default():
+            feed_dict = {
+                self.child_network_paras: child_network_architecture,
+                self.batch_size: 1
+            }
+            rnn_out = self.sess.run(self.RNN_pred_prob, feed_dict=feed_dict)
+            predict_child = np.array([[0] * self.num_para])
+            # random.seed(datetime.now())
+            for para_idx, prob in rnn_out.items():
+                predict_child[0][para_idx] = np.random.choice(range(len(self.para_2_val[para_idx])), p=prob[0])
+            hyperparameters = self.child_network_translate(predict_child)
+            return predict_child, hyperparameters
+
+    def plot_history(self, history, ylim=(-1, 1), title="reward"):
+        x = list(range(len(history)))
+        y = history
+        fig = tpl.figure()
+        fig.plot(x, y, ylim=ylim, width=60, height=20, title=title)
+        fig.show()
+
+    def get_HW_efficienct(self, Network, HW1, RC):
+        # Weiwen 01-24: Using the built Network and HW1 explored results to generate hardware efficiency
+        # with the consideration of resource constraint RC
+        return random.uniform(0, 1)
+
+    def para2interface_NN(self, Para_NN1):
+        # Weiwen 01-24: Build NN using explored hyperparamters, return Network
+        Network = -1    # func(Para_NN1)
+        return Network
+
+    def para2interface_HW(self, Para_HW1):
+        # Weiwen 01-24: Build hardware model using the explored paramters
+        HW1 = -1        # func(Para_HW1)
+        RC = [HW_constraints["r_Ports_BW"],
+              HW_constraints["r_DSP"],
+              HW_constraints["r_BRAM"],
+              HW_constraints["r_BRAM_Size"],
+              HW_constraints["BITWIDTH"]]
+        return HW1, RC
 # %%
 
 

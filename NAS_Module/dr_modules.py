@@ -40,14 +40,18 @@ class Block(nn.Module):
 class MixedBlock(nn.Module):
     def __init__(self, module, module_num):
         super(MixedBlock, self).__init__()
-        I, O, K, S, P, D, G, B, M = module.in_channels, module.out_channels, module.kernel_size, module.stride, module.padding, module.dilation, module.groups, module.bias != None, module.padding_mode
-        moduleList = []
-        for m in range(module_num):
-            new_conv = nn.Conv2d(I, O, K, S, P, D, G, B, M)
-            new_conv.weight.data = module.weight.data
-            if B:
-                new_conv.bias.data = module.bias.data
-            moduleList.append(new_conv)
+        if isinstance(module, nn.Conv2d):
+            I, O, K, S, P, D, G, B, M = module.in_channels, module.out_channels, module.kernel_size, module.stride, module.padding, module.dilation, module.groups, module.bias != None, module.padding_mode
+            moduleList = []
+            for m in range(module_num):
+                new_conv = nn.Conv2d(I, O, K, S, P, D, G, B, M)
+                new_conv.weight.data = module.weight.data
+                if B:
+                    new_conv.bias.data = module.bias.data
+                moduleList.append(new_conv)
+        else:
+            moduleList = []
+            moduleList.append(module)
         self.moduleList = nn.ModuleList(moduleList)
         self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
         self.sm = nn.Softmax(dim=-1)

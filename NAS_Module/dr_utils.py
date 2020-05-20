@@ -34,9 +34,9 @@ def make_mixed(model,layer, layer_name,num_modules):
     # print("Debug:")
     # print("name:",layer_name)
     
-    [M, N, K, S, G, P, b] = (
-        layer.out_channels, layer.in_channels, is_same(layer.kernel_size),
-        is_same(layer.stride), layer.groups, is_same(layer.padding), layer.bias)
+    # [M, N, K, S, G, P, b] = (
+    #     layer.out_channels, layer.in_channels, is_same(layer.kernel_size),
+    #     is_same(layer.stride), layer.groups, is_same(layer.padding), layer.bias)
         
     seq = layer_name.split(".")
     (pre_attr,last_attr,last_not_digit) = get_last_attr_idx(model, seq)
@@ -44,6 +44,7 @@ def make_mixed(model,layer, layer_name,num_modules):
     ## Weiwen: 03-29
     ## Step 2: Backup weights and bias if exist
     ##
+    """
     is_b = False
     if type(b)==nn.Parameter:
         ori_para_w = model.state_dict()[layer_name + ".weight"][:]
@@ -51,6 +52,7 @@ def make_mixed(model,layer, layer_name,num_modules):
         is_b = True
     else:
         ori_para_w = model.state_dict()[layer_name + ".weight"][:]
+    """
     
     new_conv = MixedBlock(layer, num_modules)
     if last_not_digit == len(seq) - 1:
