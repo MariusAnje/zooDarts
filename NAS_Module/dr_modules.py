@@ -76,7 +76,9 @@ class MixedBlock(nn.Module):
     def forward(self, x):
         # return self.moduleList[0](x)
         p = self.sm(self.mix)
-#         print(p)
+        if len(p) == 1:
+            print(p)
+            exit()
         output = p[0] * self.moduleList[0](x)
         for i in range(1, len(self.moduleList)):
             output += p[i] * self.moduleList[i](x)
