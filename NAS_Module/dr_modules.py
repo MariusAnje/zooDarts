@@ -53,14 +53,15 @@ class MixedBlock(nn.Module):
             ch = module.num_features
             [eps, momentum, affine, track_running_stats] = (module.eps, module.momentum, module.affine, module.track_running_stats)
             moduleList = []
-            new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
-            new_bn.weight.data = module.weight.data
-            new_bn.bias.data = module.bias.data
-            new_bn.running_mean.data = module.running_mean.data
-            new_bn.running_var.data = module.running_var.data 
-            new_bn.num_batches_tracked.data = module.num_batches_tracked.data
-            # new_bn.eval()
-            moduleList.append(new_bn)
+            for _ in range(module_num):
+                new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+                new_bn.weight.data = module.weight.data
+                new_bn.bias.data = module.bias.data
+                new_bn.running_mean.data = module.running_mean.data
+                new_bn.running_var.data = module.running_var.data 
+                new_bn.num_batches_tracked.data = module.num_batches_tracked.data
+                # new_bn.eval()
+                moduleList.append(new_bn)
         else:
             moduleList = []
             new_thing = module
