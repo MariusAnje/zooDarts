@@ -43,7 +43,7 @@ class MixedBlock(nn.Module):
         if isinstance(module, nn.Conv2d):
             I, O, K, S, P, D, G, B, M = module.in_channels, module.out_channels, module.kernel_size, module.stride, module.padding, module.dilation, module.groups, module.bias != None, module.padding_mode
             moduleList = []
-            for m in range(module_num):
+            for _ in range(module_num):
                 new_conv = nn.Conv2d(I, O, K, S, P, D, G, B, M)
                 new_conv.weight.data = module.weight.data
                 if B:
@@ -85,7 +85,8 @@ class MixedBlock(nn.Module):
     def superEval(self, x):
         i = self.mix.argmax()
         return self.moduleList[i](x)
-    
+
+"""    
 class SuperNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperNet, self).__init__()
@@ -131,6 +132,7 @@ class SuperNet(nn.Module):
         x = self.lastPool(x)
         x = self.classifier(x.view(-1, 512*4*4))
         return x
+"""
 
 class OriNet(nn.Module):
     def __init__(self, num_classes = 10):
