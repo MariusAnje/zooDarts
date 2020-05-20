@@ -50,14 +50,16 @@ class MixedBlock(nn.Module):
                     new_conv.bias.data = module.bias.data
                 moduleList.append(new_conv)
         elif isinstance(module, nn.BatchNorm2d):
+            ch = module.num_features
+            [eps, momentum, affine, track_running_stats] = (layer.eps, layer.momentum, layer.affine, layer.track_running_stats)
             moduleList = []
-            new_bn = nn.BatchNorm2d(module.num_features)
+            new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
             new_bn.weight.data = module.weight.data
             new_bn.bias.data = module.bias.data
             new_bn.running_mean.data = module.running_mean.data
             new_bn.running_var.data = module.running_var.data 
             new_bn.num_batches_tracked.data = module.num_batches_tracked.data
-            new_bn.eval()
+            # new_bn.eval()
             moduleList.append(new_bn)
         else:
             moduleList = []
