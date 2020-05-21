@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from copy import deepcopy
 
 class Block(nn.Module):
     # supported type: CONV1, CONV3, CONV5, CONV7, ID
@@ -37,7 +38,7 @@ class Block(nn.Module):
         
         return self.forward(x)
 
-class MixedBlock(nn.Module):
+class MixedBlock_old(nn.Module):
     def __init__(self, module, module_num):
         super(MixedBlock, self).__init__()
         if isinstance(module, nn.Conv2d):
@@ -62,12 +63,7 @@ class MixedBlock(nn.Module):
                 new_bn.num_batches_tracked.data = module.num_batches_tracked.data
                 # new_bn.eval()
                 moduleList.append(new_bn)
-        else:
-            moduleList = []
-            new_thing = module
-            new_thing.weight.data = module.weight.data
-            new_thing.bias.data = module.bias.data
-            moduleList.append(new_thing)
+                
         self.moduleList = nn.ModuleList(moduleList)
         self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
         self.sm = nn.Softmax(dim=-1)
@@ -84,6 +80,90 @@ class MixedBlock(nn.Module):
     def superEval(self, x):
         i = self.mix.argmax()
         return self.moduleList[i](x)
+
+
+
+class MixedBlock(nn.Module):
+    def __init__(self, module, module_num):
+        super(MixedBlock, self).__init__()
+        moduleList = []
+        for _ in range(module_num):
+            m = deepcopy(module)
+            moduleList.append(m)
+                
+        self.moduleList = nn.ModuleList(moduleList)
+        self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
+        self.sm = nn.Softmax(dim=-1)
+        self.is_super = False
+        
+    def modify_super(self, super:bool):
+        self.is_super = super
+        
+    def forward(self, x):
+        if self.is_super:
+            return self.superEval(x)
+        else:
+            p = self.sm(self.mix)
+            output = p[0] * self.moduleList[0](x)
+            for i in range(1, len(self.moduleList)):
+                output += p[i] * self.moduleList[i](x)
+            return output
+    
+    def superEval(self, x):
+        i = self.mix.argmax()
+        return self.moduleList[i](x)
+
+class MixedNet(nn.Module):
+    def __init__(self, model):
+        super(MixedNet, self).__init__()
+        self.model = model
+    
+    def forward(self, x):
+        self.model(x)
+    
+    def get_arch_params(self):
+        arch_params = []
+        for name, module in self.model.named_modules():
+            if isinstance(module, dr_modules.MixedBlock):
+                arch_params.append(module.mix)
+        return arch_params
+    
+    def modify_super(self, if_super):
+        for name, module in self.model.named_modules():
+            if isinstance(module, dr_modules.MixedBlock):
+                module.modify_super(if_super)
+    
+    def train(self, loader, optimizer, criterion):
+        running_loss = 0.0
+        i = 0
+        for inputs, labels in loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss
+            i += 1
+            loader.set_description(f"{running_loss/i:.4f}")
+            if i == 20:
+                break
+
+    def test(self, loader):
+        correct = 0
+        total = 0
+        ct = 0
+        model.eval()
+        with torch.no_grad():
+            for inputs, labels in loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                predicted = torch.argmax(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                loader.set_description(f"{correct}, {total}")
+
+            print(f"{correct}, {total}, {ct}, acc: {correct/total}")
 
 """    
 class SuperNet(nn.Module):
