@@ -352,7 +352,7 @@ def prune_weight(weight, device, percent):
     return mask
 
 def apply_prune(model, layer_names, device, percent):
-    print("Apply Pruning based on percent:",percent)
+    # print("Apply Pruning based on percent:",percent)
     dict_mask = {}
     idx = 0
     for name in layer_names:
@@ -364,7 +364,7 @@ def apply_prune(model, layer_names, device, percent):
 
 
 def get_layers_pattern(model, layer_names, pattern, device):
-    print("Apply Pruning based on pattern")
+    # print("Apply Pruning based on pattern")
     # for name in layer_names:
     #     model.state_dict()[name + ".weight"][:].data.mul_((layer_pattern[name]).to(device))
     layer_pattern = {}

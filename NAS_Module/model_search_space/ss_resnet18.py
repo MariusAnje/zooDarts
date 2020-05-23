@@ -55,6 +55,65 @@ def resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, args):
 
     return layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras
 
+def resnet_18_dr_pre_dna(model, pattern_idx, k_expand, ch_list, q_list, args):
+
+    parttern_77_space = pattern_sets_generate_3((7, 7))
+    parttern_77 = {}
+    for i in parttern_77_space.keys():
+        parttern_77[i] = parttern_77_space[i].reshape((7, 7))
+    layer_names_77 = ["conv1"]
+
+    pattern_space = pattern_sets_generate_3((3, 3))
+    pattern = {}
+    i = 0
+    for idx in pattern_idx:
+        pattern[i] = pattern_space[idx].reshape((3, 3))
+        i+=1
+    layer_names = ["layer1.0.conv1","layer1.0.conv2","layer1.1.conv1",
+        "layer1.1.conv2","layer2.0.conv2","layer2.1.conv1","layer2.1.conv2"]
+
+
+    if k_expand == 0:
+        layer_kernel_inc = []
+    elif k_expand == 1:
+        layer_kernel_inc = ["layer2.0.conv1"]
+    elif k_expand == 2:
+        layer_kernel_inc = ["layer2.0.downsample.0"]
+    else:
+        layer_kernel_inc = ["layer2.0.conv1","layer2.0.downsample.0"]
+
+    channel_cut_layers = [["layer1.0.conv1", "layer1.0.conv2", "layer1.0.bn1", (64, 64, 64)],
+                          ["layer1.1.conv1", "layer1.1.conv2", "layer1.1.bn1", (64, 64, 64)],
+                          ["layer2.0.conv1", "layer2.0.conv2", "layer2.0.bn1", (64, 128, 128)],
+                          ["layer2.1.conv1", "layer2.1.conv2", "layer2.1.bn1", (128, ch_list[0], 128)],
+                          ["layer3.0.conv1", "layer3.0.conv2", "layer3.0.bn1", (128, ch_list[1], 256)],
+                          ["layer3.1.conv1", "layer3.1.conv2", "layer3.1.bn1", (256, ch_list[2], 256)],
+                          ["layer4.0.conv1", "layer4.0.conv2", "layer4.0.bn1", (256, ch_list[3], 512)],
+                          ["layer4.1.conv1", "layer4.1.conv2", "layer4.1.bn1", (512, ch_list[4], 512)]]
+
+    quant_layers = ["layer3.0.conv1", "layer3.0.conv2",
+                    "layer3.1.conv1", "layer3.1.conv2",
+                    "layer4.0.conv1", "layer4.0.conv2",
+                    "layer4.1.conv1", "layer4.1.conv2"]
+    quan_paras = {}
+    quan_paras["layer3.0.conv1"] = [0, q_list[0], True]
+    quan_paras["layer3.0.conv2"] = [0, q_list[1], True]
+    quan_paras["layer3.1.conv1"] = [0, q_list[2], True]
+    quan_paras["layer3.1.conv2"] = [0, q_list[3], True]
+    quan_paras["layer4.0.conv1"] = [0, q_list[4], True]
+    quan_paras["layer4.0.conv2"] = [0, q_list[5], True]
+    quan_paras["layer4.1.conv1"] = [0, q_list[6], True]
+    quan_paras["layer4.1.conv2"] = [0, q_list[7], True]
+
+
+    model_modify.Channel_Cut(model, channel_cut_layers)
+    # model_modify.Kernel_Patter(model, layer_names, pattern, args)
+    model_modify.Kenel_Expand(model, layer_kernel_inc)
+    model_modify.Kenel_Quantization(model, quant_layers, quan_paras)
+
+    model_modify.Kernel_Patter(model, layer_names_77, parttern_77, args)
+
+    return model
 
 # [1,22,49,54], 3, [100,210,210,470,470]
 def resnet_18_space(model, pattern_idx, k_expand, ch_list, q_list, args):

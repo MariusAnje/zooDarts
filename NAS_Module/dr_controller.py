@@ -108,16 +108,20 @@ class Controller(object):
         self.explored_info = {}
 
         self.target_HW_Eff = HW_constraints["target_HW_Eff"]
-
-        self.pattern_space = pattern_sets_generate_3((3,3))
         """
+        
+        self.pattern_space = pattern_sets_generate_3((3,3))
+        
 
     def global_train(self):
         import torchvision
-        from dr_utils import make_mixed
+        from dr_modules import make_mixed
         import dr_modules
         from torch import nn
-        
+        import torch.optim as optim
+        from tqdm import tqdm
+        from model_search_space import ss_resnet18
+
         """
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
@@ -125,13 +129,44 @@ class Controller(object):
         step = 0
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
-        device = torch.device("cuda:1")
-        dna = self.nn1_search_space
+        device = torch.device(self.args.device)
+        
+        space = self.nn1_search_space
         model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
+        
+        # use preset DNAs to create pruned model
+        dna = [23, 14, 8, 42, 0, 128, 256, 256, 480, 496, 16, 16, 16, 16, 8, 8, 8, 8, 2, -1, 0]
+        pat_point, exp_point, ch_point, quant_point, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
+        model = ss_resnet18.resnet_18_dr_pre_dna(model, pat_point, exp_point, ch_point, quant_point, self.args)
 
-        pattern_idx, k_expand, ch_list, q_list, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
+        # search non-preset hyperparameters: search space
+        pattern_idx, k_expand, ch_list, q_list, comm_point = space[0:4], space[4], space[5:10], space[10:18], space[18:21]
         layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras \
             = self.nn_model_helper.resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, self.args)
+
+        # create DARTS model
+        training = True # if train (finetune) the pruned the model
+        mixedModel = dr_modules.MixedResNet18(model)
+        mixedModel.create_mixed(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, self.args)
+        mixedModel.to(device)
+        arch_params = mixedModel.get_arch_params()
+        net_params = mixedModel.get_net_params()
+        arch_optimizer = optim.Adam(arch_params, lr = 1e-2)
+        net_optimizer = optim.Adam(net_params, lr = 1e-5)
+        criterion = nn.CrossEntropyLoss()
+
+
+        # print(model)
+        if training:
+            # mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000)
+            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, -1)
+
+        mixedModel.modify_super(True)
+        with tqdm(self.data_loader_test) as loader_test:
+            mixedModel.test(loader_test, device)
+        exit()
+
+
         
         # model.train()
         # print(layer_kernel_inc)

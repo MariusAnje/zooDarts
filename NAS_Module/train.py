@@ -419,6 +419,7 @@ def parse_args():
 
     args = parser.parse_args()
 
+    """
     print("=" * 58)
     print("="*10,"Welcome to use automatic reverse NAS","="*10)
     print("="*11,"Your setting is listed as follows","="*12)
@@ -459,6 +460,7 @@ def parse_args():
             sys.exit(0)
         print("\t{:<20} {:<15}".format(space_name[idx], sp))
     print("-" * 58)
+    """
 
     return args
 

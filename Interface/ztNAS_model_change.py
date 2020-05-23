@@ -340,7 +340,7 @@ def ztNAS_cut_channel(model,conv_modify,bn_modifiy):
         ## Step 2: Backup weights and bias if exist
         ##
         if layer_name not in INDEX.keys():
-            print("[WARNING]: Batchnorm index must be obtained from previous conv, THIS indicates that the batchnorm will not be changed")
+            # print("[WARNING]: Batchnorm index must be obtained from previous conv, THIS indicates that the batchnorm will not be changed")
             return
         if affine:
             ori_para_b = model.state_dict()[layer_name + ".bias"][INDEX[layer_name]]

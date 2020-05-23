@@ -5,81 +5,92 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
+import sys
+sys.path.append("../Interface")
+from utility import is_same
+import pattern_kernel
+import copy_conv2d
+from pattern_generator import pattern_sets_generate_3
+import model_modify
+import copy_conv2d
+from tqdm import tqdm
 
-class Block(nn.Module):
-    # supported type: CONV1, CONV3, CONV5, CONV7, ID
-    def __init__(self, bType:str, in_channels:int, out_channels:int, norm:bool = False):
-        super(Block, self).__init__()
-        if bType == "ID":
-            self.op = nn.Identity()
-            norm = False
-        elif bType == "CONV1":
-            self.op = nn.Conv2d(in_channels, out_channels, 1)
-        elif bType == "CONV3":
-            self.op = nn.Conv2d(in_channels, out_channels, 3, padding = 1)
-        elif bType == "CONV5":
-            self.op = nn.Conv2d(in_channels, out_channels, 5, padding = 2)
-        elif bType == "CONV7":
-            self.op = nn.Conv2d(in_channels, out_channels, 7, padding = 3)
-        self.act = nn.ReLU()
-        if norm:
-            self.norm = nn.BatchNorm2d(out_channels)
+
+def get_last_attr_idx(model,seq):
+
+    last_not_digit = 0
+    pre_attr = model
+    last_attr = []
+
+
+    a = model
+    for idx in range(len(seq)):
+        var = seq[idx]
+        if var.isdigit():
+            a = a[int(var)]
         else:
-            self.norm = nn.Identity()
-        self.drop = nn.Dropout(p = 0.3)
-        
-        
+            pre_attr = a
+            a = getattr(a, var)
+            last_not_digit = idx
+            last_attr = a
+    return pre_attr,last_attr,last_not_digit
 
-    def forward(self, x):
 
-        return self.norm(self.act(self.op(x)))
+def make_mixed(model,layer, layer_name,num_modules):
+
+    # print("Debug:")
+    # print("name:",layer_name)
     
-    def inference(self, x):
+    # [M, N, K, S, G, P, b] = (
+    #     layer.out_channels, layer.in_channels, is_same(layer.kernel_size),
+    #     is_same(layer.stride), layer.groups, is_same(layer.padding), layer.bias)
         
-        return self.forward(x)
+    seq = layer_name.split(".")
+    (pre_attr,last_attr,last_not_digit) = get_last_attr_idx(model, seq)
 
-class MixedBlock_old(nn.Module):
-    def __init__(self, module, module_num):
-        super(MixedBlock, self).__init__()
-        if isinstance(module, nn.Conv2d):
-            I, O, K, S, P, D, G, B, M = module.in_channels, module.out_channels, module.kernel_size, module.stride, module.padding, module.dilation, module.groups, module.bias != None, module.padding_mode
-            moduleList = []
-            for _ in range(module_num):
-                new_conv = nn.Conv2d(I, O, K, S, P, D, G, B, M)
-                new_conv.weight.data = module.weight.data
-                if B:
-                    new_conv.bias.data = module.bias.data
-                moduleList.append(new_conv)
-        elif isinstance(module, nn.BatchNorm2d):
-            ch = module.num_features
-            [eps, momentum, affine, track_running_stats] = (module.eps, module.momentum, module.affine, module.track_running_stats)
-            moduleList = []
-            for _ in range(module_num):
-                new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
-                new_bn.weight.data = module.weight.data
-                new_bn.bias.data = module.bias.data
-                new_bn.running_mean.data = module.running_mean.data
-                new_bn.running_var.data = module.running_var.data 
-                new_bn.num_batches_tracked.data = module.num_batches_tracked.data
-                # new_bn.eval()
-                moduleList.append(new_bn)
-                
-        self.moduleList = nn.ModuleList(moduleList)
-        self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
-        self.sm = nn.Softmax(dim=-1)
-        
-
-    def forward(self, x):
-        # return self.moduleList[0](x)
-        p = self.sm(self.mix)
-        output = p[0] * self.moduleList[0](x)
-        for i in range(1, len(self.moduleList)):
-            output += p[i] * self.moduleList[i](x)
-        return output
+    ## Weiwen: 03-29
+    ## Step 2: Backup weights and bias if exist
+    ##
+    """
+    is_b = False
+    if type(b)==nn.Parameter:
+        ori_para_w = model.state_dict()[layer_name + ".weight"][:]
+        ori_para_b = model.state_dict()[layer_name + ".bias"][:]
+        is_b = True
+    else:
+        ori_para_w = model.state_dict()[layer_name + ".weight"][:]
+    """
     
-    def superEval(self, x):
-        i = self.mix.argmax()
-        return self.moduleList[i](x)
+    new_conv = MixedBlock(layer, num_modules)
+    if last_not_digit == len(seq) - 1:
+        # last one is the attribute, directly setattr
+        setattr(pre_attr, seq[-1], new_conv)
+    elif last_not_digit == len(seq) - 2:
+        # one index last_attr[]
+        last_attr[int(seq[-1])] = new_conv
+        setattr(pre_attr, seq[-2], last_attr)
+    elif last_not_digit == len(seq) - 3:
+        # two index last_attr[][]
+        last_attr[int(seq[-2])][int(seq[-1])] = new_conv
+        setattr(pre_attr, seq[-3], last_attr)
+    else:
+        print("more than 2 depth of index from last layer is not support!")
+        sys.exit(0)
+
+    ## Weiwen: 03-29
+    ## Step 4: Setup new parameters from backup
+    ##
+    """
+    if is_b:
+        model.state_dict()[layer_name + ".bias"][:] = ori_para_b
+
+    if var_k>0:
+        pad_fun = torch.nn.ZeroPad2d(int(var_k/2))
+        model.state_dict()[layer_name + ".weight"][:] = pad_fun(ori_para_w)
+    """
+
+
+    return model
 
 
 
@@ -113,6 +124,7 @@ class MixedBlock(nn.Module):
         i = self.mix.argmax()
         return self.moduleList[i](x)
 
+
 class MixedNet(nn.Module):
     def __init__(self, model):
         super(MixedNet, self).__init__()
@@ -124,40 +136,89 @@ class MixedNet(nn.Module):
     def get_arch_params(self):
         arch_params = []
         for name, module in self.model.named_modules():
-            if isinstance(module, dr_modules.MixedBlock):
+            if isinstance(module, MixedBlock):
                 arch_params.append(module.mix)
         return arch_params
     
+    def get_net_params(self):
+        net_params = []
+        for name, module in self.model.named_modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, copy_conv2d.Conv2d_Custom) or isinstance(module, nn.BatchNorm2d):
+                net_params.append(module.weight)
+                try:
+                    a = module.bias.size()
+                    net_params.append(module.bias)
+                except:
+                    pass
+        return net_params
+
     def modify_super(self, if_super):
         for name, module in self.model.named_modules():
-            if isinstance(module, dr_modules.MixedBlock):
+            if isinstance(module, MixedBlock):
                 module.modify_super(if_super)
     
-    def train(self, loader, optimizer, criterion):
+    def train(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters):
+        self.model.train()
         running_loss = 0.0
         i = 0
-        for inputs, labels in loader:
+        run_loader = tqdm(loader)
+        for inputs, labels in run_loader:
             inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(inputs)
+            net_optimizer.zero_grad()
+            outputs = self.model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
-            optimizer.step()
+            net_optimizer.step()
             running_loss += loss
+            
+
+            arch_inputs, arch_labels = next(iter(loader))
+            arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
+            arch_optimizer.zero_grad()
+            outputs = self.model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            arch_optimizer.step()
+            
             i += 1
-            loader.set_description(f"{running_loss/i:.4f}")
-            if i == 20:
+            run_loader.set_description(f"{running_loss/i:.4f}")
+
+            if i == num_iters:
                 break
 
-    def test(self, loader):
+    def train_fast(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters):
+        self.model.train()
+        running_loss = 0.0
+        i = 0
+        run_loader = tqdm(loader)
+        for inputs, labels in run_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            net_optimizer.zero_grad()
+            arch_optimizer.zero_grad()
+            outputs = self.model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            if i%2 == 0:
+                net_optimizer.step()
+            else:
+                arch_optimizer.step()
+            running_loss += loss
+
+            i += 1
+            run_loader.set_description(f"{running_loss/i:.4f}")
+
+            if i == num_iters * 2:
+                break
+
+    def test(self, loader, device):
         correct = 0
         total = 0
         ct = 0
-        model.eval()
+        self.model.eval()
         with torch.no_grad():
             for inputs, labels in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model(inputs)
+                outputs = self.model(inputs)
                 predicted = torch.argmax(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
@@ -165,7 +226,79 @@ class MixedNet(nn.Module):
 
             print(f"{correct}, {total}, {ct}, acc: {correct/total}")
 
+
+class MixedResNet18(MixedNet):
+    def __init__(self, model):
+        super(MixedResNet18, self).__init__(model)
+        self.model = model
+
+    def create_mixed(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, args):
+        model = self.model
+        module_dict = dict(model.named_modules())
+        pattern_space = pattern_sets_generate_3((3,3))
+        
+        # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
+        # Kernel Pattern layers
+        for name in layer_names:
+            make_mixed(model, module_dict[name], name, 56)
+            pattern = {}
+            simple_names = []
+            for i in range(56):
+                pattern[i] = pattern_space[i].reshape((3, 3))
+                simple_names.append(name + f".moduleList.{i}")
+            model_modify.Kernel_Patter(model, simple_names, pattern, args)
+        
+        """
+        module_dict = dict(model.named_modules())
+        # Channel Cut
+        for item in channel_cut_layers[3:]:
+            for name in item[:3]:
+                make_mixed(model, module_dict[name], name, len(item[3][1]))
+        
+        module_dict = dict(model.named_modules())
+        for name in quant_layers:
+            make_mixed(model, module_dict[name], name, len(quan_paras[name][1]))
+        """
+
+        self.model = model
+
+
+
 """    
+class Block(nn.Module):
+    # supported type: CONV1, CONV3, CONV5, CONV7, ID
+    def __init__(self, bType:str, in_channels:int, out_channels:int, norm:bool = False):
+        super(Block, self).__init__()
+        if bType == "ID":
+            self.op = nn.Identity()
+            norm = False
+        elif bType == "CONV1":
+            self.op = nn.Conv2d(in_channels, out_channels, 1)
+        elif bType == "CONV3":
+            self.op = nn.Conv2d(in_channels, out_channels, 3, padding = 1)
+        elif bType == "CONV5":
+            self.op = nn.Conv2d(in_channels, out_channels, 5, padding = 2)
+        elif bType == "CONV7":
+            self.op = nn.Conv2d(in_channels, out_channels, 7, padding = 3)
+        self.act = nn.ReLU()
+        if norm:
+            self.norm = nn.BatchNorm2d(out_channels)
+        else:
+            self.norm = nn.Identity()
+        self.drop = nn.Dropout(p = 0.3)
+        
+        
+
+    def forward(self, x):
+
+        return self.norm(self.act(self.op(x)))
+    
+    def inference(self, x):
+        
+        return self.forward(x)
+
+
+
 class SuperNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperNet, self).__init__()
@@ -211,7 +344,6 @@ class SuperNet(nn.Module):
         x = self.lastPool(x)
         x = self.classifier(x.view(-1, 512*4*4))
         return x
-"""
 
 class OriNet(nn.Module):
     def __init__(self, num_classes = 10):
@@ -251,3 +383,46 @@ class OriNet(nn.Module):
         x = self.classifier(x.view(-1, 512*4*4))
         return x
         
+class MixedBlock_old(nn.Module):
+    def __init__(self, module, module_num):
+        super(MixedBlock, self).__init__()
+        if isinstance(module, nn.Conv2d):
+            I, O, K, S, P, D, G, B, M = module.in_channels, module.out_channels, module.kernel_size, module.stride, module.padding, module.dilation, module.groups, module.bias != None, module.padding_mode
+            moduleList = []
+            for _ in range(module_num):
+                new_conv = nn.Conv2d(I, O, K, S, P, D, G, B, M)
+                new_conv.weight.data = module.weight.data
+                if B:
+                    new_conv.bias.data = module.bias.data
+                moduleList.append(new_conv)
+        elif isinstance(module, nn.BatchNorm2d):
+            ch = module.num_features
+            [eps, momentum, affine, track_running_stats] = (module.eps, module.momentum, module.affine, module.track_running_stats)
+            moduleList = []
+            for _ in range(module_num):
+                new_bn = nn.BatchNorm2d(ch, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+                new_bn.weight.data = module.weight.data
+                new_bn.bias.data = module.bias.data
+                new_bn.running_mean.data = module.running_mean.data
+                new_bn.running_var.data = module.running_var.data 
+                new_bn.num_batches_tracked.data = module.num_batches_tracked.data
+                # new_bn.eval()
+                moduleList.append(new_bn)
+                
+        self.moduleList = nn.ModuleList(moduleList)
+        self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
+        self.sm = nn.Softmax(dim=-1)
+        
+
+    def forward(self, x):
+        # return self.moduleList[0](x)
+        p = self.sm(self.mix)
+        output = p[0] * self.moduleList[0](x)
+        for i in range(1, len(self.moduleList)):
+            output += p[i] * self.moduleList[i](x)
+        return output
+    
+    def superEval(self, x):
+        i = self.mix.argmax()
+        return self.moduleList[i](x)
+"""

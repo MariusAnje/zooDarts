@@ -288,6 +288,8 @@ class Controller(object):
 
                 Para_NN1 = hyperparameters[0][self.nn1_beg:self.nn1_end]
                 # Para_HW1 = hyperparameters[0][self.hw1_beg:self.hw1_end]
+                print(Para_NN1)
+                exit()
 
 
                 str_NN1 = " ".join(str(x) for x in Para_NN1)
