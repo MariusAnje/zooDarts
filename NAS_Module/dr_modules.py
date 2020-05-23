@@ -148,6 +148,13 @@ class MixedNet(nn.Module):
     def forward(self, x):
         self.model(x)
     
+    def get_latency(self):
+        latency = 0
+        for name, module in self.model.named_modules():
+            if isinstance(module, MixedBlock):
+                latency += module.get_latency()
+        return latency
+
     def get_arch_params(self):
         arch_params = []
         for name, module in self.model.named_modules():

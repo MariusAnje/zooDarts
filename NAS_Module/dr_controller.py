@@ -155,6 +155,7 @@ class Controller(object):
         net_optimizer = optim.Adam(net_params, lr = 1e-5)
         criterion = nn.CrossEntropyLoss()
 
+        print(mixedModel.get_latency())
 
         # print(model)
         if training:
