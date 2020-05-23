@@ -112,7 +112,7 @@ class MixedBlock(nn.Module):
     
     def get_latency(self):
         latency = torch.zeros_like(self.mix)
-        leaf = isinstance(self.moduleList[0], MixedBlock)
+        leaf = not isinstance(self.moduleList[0], MixedBlock)
         if leaf:
             for i in range(latency.size(0)):
                 if isinstance(self.moduleList[i], nn.Conv2d) or isinstance(self.moduleList[i], copy_conv2d.Conv2d_Custom):
