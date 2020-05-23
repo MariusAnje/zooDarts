@@ -206,6 +206,7 @@ class MixedNet(nn.Module):
             run_loader.set_description(f"{running_loss/i:.4f}")
 
             if i%10 == 0:
+                print("save checkpoint")
                 torch.save(self.model.state_dict(), "dr_checkpoint.pt")
 
             if i == num_iters:
