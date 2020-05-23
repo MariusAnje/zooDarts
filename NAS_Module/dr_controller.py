@@ -155,7 +155,15 @@ class Controller(object):
         net_optimizer = optim.Adam(net_params, lr = 1e-5)
         criterion = nn.CrossEntropyLoss()
 
-        print(mixedModel.get_latency())
+        l = mixedModel.get_latency()
+        l.backward()
+
+        pretrained = False
+
+        if pretrained:
+            training = False
+            state_dict = torch.load("dr_checkpoint.pt")
+            mixedModel.load_state_dict(state_dict)
 
         # print(model)
         if training:

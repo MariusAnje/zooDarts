@@ -148,6 +148,9 @@ class MixedNet(nn.Module):
     def forward(self, x):
         self.model(x)
     
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
+
     def get_latency(self):
         latency = 0
         for name, module in self.model.named_modules():
