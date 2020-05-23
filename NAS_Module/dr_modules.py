@@ -109,6 +109,21 @@ class MixedBlock(nn.Module):
         
     def modify_super(self, super:bool):
         self.is_super = super
+    
+    def get_latency(self):
+        latency = torch.zeros_like(self.mix)
+        leaf = isinstance(self.moduleList[0], MixedBlock)
+        if leaf:
+            for i in range(latency.size(0)):
+                if isinstance(self.moduleList[i], nn.Conv2d) or isinstance(self.moduleList[i], copy_conv2d.Conv2d_Custom):
+                    latency[i] = 1
+                else:
+                    latency[i] = 0
+        else:
+            for i in range(latency.size(0)):
+                latency[i] = self.moduleList[i].get_latency
+        p = self.sm(self.mix)
+        return p.dot(latency)
         
     def forward(self, x):
         if self.is_super:
@@ -182,6 +197,9 @@ class MixedNet(nn.Module):
             
             i += 1
             run_loader.set_description(f"{running_loss/i:.4f}")
+
+            if i%10 == 0:
+                torch.save(self.model.state_dict(), "dr_checkpoint.pt")
 
             if i == num_iters:
                 break
