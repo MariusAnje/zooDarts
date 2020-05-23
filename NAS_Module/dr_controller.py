@@ -45,10 +45,11 @@ class Controller(object):
         self.target_acc = [float(x) for x in self.args.target_acc.split(" ")]
         self.target_lat = [float(x) for x in self.args.target_lat.split(" ")]
         
-        """
+
         [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p] = [int(x.strip()) for x in self.args.cconv.split(",")]
         self.HW = [Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p]
         self.HW2 = [int(x.strip()) for x in self.args.dconv.split(",")]
+        """
         self.graph = tf.Graph()
 
         config = tf.ConfigProto()
@@ -132,11 +133,15 @@ class Controller(object):
         device = torch.device(self.args.device)
         
         space = self.nn1_search_space
-        model = torchvision.models.__dict__[self.args.model](pretrained=self.args.pretrained)
+        model = torchvision.models.__dict__[self.args.model](pretrained=True)
         
         # use preset DNAs to create pruned model
         dna = [23, 14, 8, 42, 0, 128, 256, 256, 480, 496, 16, 16, 16, 16, 8, 8, 8, 8, 2, -1, 0]
         pat_point, exp_point, ch_point, quant_point, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
+        HW = copy.deepcopy(self.HW)
+        HW[5] += comm_point[0]
+        HW[6] += comm_point[1]
+        HW[7] += comm_point[2]
         model = ss_resnet18.resnet_18_dr_pre_dna(model, pat_point, exp_point, ch_point, quant_point, self.args)
 
         # search non-preset hyperparameters: search space
@@ -144,9 +149,15 @@ class Controller(object):
         layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras \
             = self.nn_model_helper.resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, self.args)
 
-        # create DARTS model
+        # create model
         training = True # if train (finetune) the pruned the model
-        mixedModel = dr_modules.MixedResNet18(model)
+        mixedModel = dr_modules.MixedResNet18(model, HW, device)
+
+        #calculate original latency
+        mixedModel.to(device)
+        mixedModel.get_ori_latency(device, layer_names)
+
+        # create DARTS model
         mixedModel.create_mixed(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
@@ -155,12 +166,8 @@ class Controller(object):
         net_optimizer = optim.Adam(net_params, lr = 1e-5)
         criterion = nn.CrossEntropyLoss()
 
-        l = mixedModel.get_latency()
-        l.backward()
 
-        pretrained = True
-
-        if pretrained:
+        if self.args.pretrained:
             training = False
             state_dict = torch.load("dr_checkpoint.pt")
             mixedModel.load_state_dict(state_dict)
@@ -173,7 +180,16 @@ class Controller(object):
         mixedModel.modify_super(True)
         with tqdm(self.data_loader_test) as loader_test:
             mixedModel.test(loader_test, device)
+            print(mixedModel.get_latency(device))
         exit()
+
+        """
+        ====================================================================================================
+
+        ends here
+
+        ====================================================================================================
+        """
 
 
         
@@ -181,6 +197,7 @@ class Controller(object):
         # print(layer_kernel_inc)
         # print(channel_cut_layers)
         # print(quant_layers)
+        
         module_dict = dict(model.named_modules())
         
         # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
@@ -530,6 +547,7 @@ class Controller(object):
               HW_constraints["r_BRAM_Size"],
               HW_constraints["BITWIDTH"]]
         return HW1, RC
+
 # %%
 
 

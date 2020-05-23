@@ -14,7 +14,7 @@ from pattern_generator import pattern_sets_generate_3
 import model_modify
 import copy_conv2d
 from tqdm import tqdm
-
+import dr_hw
 
 def get_last_attr_idx(model,seq):
 
@@ -106,26 +106,39 @@ class MixedBlock(nn.Module):
         self.mix = nn.Parameter(torch.ones(module_num)).requires_grad_()
         self.sm = nn.Softmax(dim=-1)
         self.is_super = False
+        self.input_size = 0
+        self.latency = None
         
     def modify_super(self, super:bool):
         self.is_super = super
     
-    def get_latency(self):
+    def init_latency(self, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device):
         latency = torch.zeros_like(self.mix)
         leaf = not isinstance(self.moduleList[0], MixedBlock)
         if leaf:
             for i in range(latency.size(0)):
                 if isinstance(self.moduleList[i], nn.Conv2d) or isinstance(self.moduleList[i], copy_conv2d.Conv2d_Custom):
-                    latency[i] = 1
+                    latency[i] = dr_hw.get_performance_layer(self.moduleList[i], Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
                 else:
                     latency[i] = 0
         else:
             for i in range(latency.size(0)):
-                latency[i] = self.moduleList[i].get_latency
-        p = self.sm(self.mix)
-        return p.dot(latency)
+                latency[i] = self.moduleList[i].get_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
+        
+        self.latency = latency
+    
+    def get_latency(self, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device):
+        latency = self.latency
+        
+        if self.is_super:
+            i = self.mix.argmax()
+            return latency[i]
+        else:
+            p = self.sm(self.mix)
+            return p.dot(latency)
         
     def forward(self, x):
+        self.input_size = x.size()
         if self.is_super:
             return self.superEval(x)
         else:
@@ -141,9 +154,11 @@ class MixedBlock(nn.Module):
 
 
 class MixedNet(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, HW, device):
         super(MixedNet, self).__init__()
         self.model = model
+        self.HW = HW
+        self.device = device
     
     def forward(self, x):
         self.model(x)
@@ -151,11 +166,20 @@ class MixedNet(nn.Module):
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
 
-    def get_latency(self):
-        latency = 0
+    def init_latency(self, device):
+        HW = self.HW
+        # TODO: bug here!!!!! incorrect if recursive MixedBlocks
         for name, module in self.model.named_modules():
             if isinstance(module, MixedBlock):
-                latency += module.get_latency()
+                module.init_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
+
+    def get_latency(self, device):
+        latency = 0
+        HW = self.HW
+        # TODO: bug here!!!!! incorrect if recursive MixedBlocks
+        for name, module in self.model.named_modules():
+            if isinstance(module, MixedBlock):
+                latency += module.get_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
         return latency
 
     def get_arch_params(self):
@@ -201,7 +225,7 @@ class MixedNet(nn.Module):
             arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
             arch_optimizer.zero_grad()
             outputs = self.model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels) + self.get_latency(device) + self.ori_latency
             loss.backward()
             arch_optimizer.step()
             
@@ -225,15 +249,19 @@ class MixedNet(nn.Module):
             arch_optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = criterion(outputs, labels)
-            loss.backward()
+            latency = self.get_latency(device)
+            running_loss += loss
             if i%2 == 0:
+                loss.backward()
                 net_optimizer.step()
             else:
+                loss += latency + self.ori_latency
+                loss.backward()
                 arch_optimizer.step()
-            running_loss += loss
+            
 
             i += 1
-            run_loader.set_description(f"{running_loss/i:.4f}")
+            run_loader.set_description(f"{running_loss/i:.4f}, {latency:.4f}")
 
             if i%10 == 0:
                 torch.save(self.model.state_dict(), "dr_checkpoint.pt")
@@ -259,10 +287,16 @@ class MixedNet(nn.Module):
 
 
 class MixedResNet18(MixedNet):
-    def __init__(self, model):
-        super(MixedResNet18, self).__init__(model)
-        self.model = model
+    def __init__(self, model, HW, device):
+        super(MixedResNet18, self).__init__(model, HW, device)
+        # self.model = model
+        self.ori_latency = None
 
+    def get_ori_latency(self, device=None, ignored_layers = []):
+        model = self.model
+        HW = self.HW
+        self.ori_latency = dr_hw.get_performance(model, HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device, ignored_layers)
+    
     def create_mixed(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, args):
         model = self.model
         module_dict = dict(model.named_modules())
@@ -292,7 +326,9 @@ class MixedResNet18(MixedNet):
         """
 
         self.model = model
-
+        self.model.to(self.device)
+        self.model(torch.Tensor(1,3,224,224).to(self.device))
+        self.init_latency(self.device)
 
 
 """    
