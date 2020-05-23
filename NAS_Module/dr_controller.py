@@ -158,7 +158,7 @@ class Controller(object):
         l = mixedModel.get_latency()
         l.backward()
 
-        pretrained = False
+        pretrained = True
 
         if pretrained:
             training = False
