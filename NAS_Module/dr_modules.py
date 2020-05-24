@@ -301,7 +301,7 @@ class MixedResNet18(MixedNet):
         HW = self.HW
         self.ori_latency = dr_hw.get_performance(model, HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device, ignored_layers)
     
-    def create_mixed(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, args):
+    def create_mixed_pattern(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, args):
         model = self.model
         module_dict = dict(model.named_modules())
         pattern_space = pattern_sets_generate_3((3,3))
@@ -316,9 +316,26 @@ class MixedResNet18(MixedNet):
             for i in range(56):
                 pattern[i] = pattern_space[i].reshape((3, 3))
                 simple_names.append(name + f".moduleList.{i}")
-            model_modify.Kernel_Patter_dr(model, simple_names, pattern, args)
-            # exit()
+
+            model_modify.Kernel_Patter(model, simple_names, pattern, args)
+    
+    def create_mixed_quant(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras_ori, args):
+        model = self.model
+        module_dict = dict(model.named_modules())
+        print(quant_paras_ori)
+        exit()
         
+        # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
+        # Kernel Pattern layers
+        for name in quant_layers:
+            make_mixed(model, module_dict[name], name, 56)
+            pattern = {}
+            simple_names = []
+            for i in range(56):
+                pattern[i] = pattern_space[i].reshape((3, 3))
+                simple_names.append(name + f".moduleList.{i}")
+            model_modify.Kenel_Quantization(model, quant_layers, quan_paras)
+
         """
         module_dict = dict(model.named_modules())
         # Channel Cut
