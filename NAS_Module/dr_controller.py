@@ -155,7 +155,7 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, layer_names)
+        mixedModel.get_ori_latency(device, quant_layers)
 
         # create DARTS model
         mixedModel.create_mixed(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, self.args)
