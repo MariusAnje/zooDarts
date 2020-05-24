@@ -146,7 +146,7 @@ class Controller(object):
 
         # search non-preset hyperparameters: search space
         pattern_idx, k_expand, ch_list, q_list, comm_point = space[0:4], space[4], space[5:10], space[10:18], space[18:21]
-        layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras \
+        layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras \
             = self.nn_model_helper.resnet_18_dr(pattern_idx, k_expand, ch_list, q_list, self.args)
 
         # create model
@@ -158,7 +158,7 @@ class Controller(object):
         mixedModel.get_ori_latency(device, quant_layers)
 
         # create DARTS model
-        mixedModel.create_mixed(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quan_paras, self.args)
+        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
