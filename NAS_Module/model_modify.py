@@ -17,7 +17,8 @@ from model_search_space.ss_resnet18 import *
 
 def Kernel_Patter(model,layer_names,pattern,args):
     layer_pattern = utils.get_layers_pattern(model, layer_names, pattern, args.device)
-
+    # print((layer_pattern[layer_names[0]] != layer_pattern[layer_names[1]]).sum())
+    # exit()
     max_p_r = -1
 
     for k,p in pattern.items():
@@ -30,6 +31,23 @@ def Kernel_Patter(model,layer_names,pattern,args):
         layer = dict(model.named_modules())[layer_name]
         ztNAS_add_kernel_mask(model, layer, layer_name, is_pattern=True,
                           pattern=layer_pattern[layer_name].to(args.device), pattern_ones=pattern_ones)
+
+def Kernel_Patter_dr(model,layer_names,pattern,args):
+    layer_pattern = utils.get_layers_pattern(model, layer_names, pattern, args.device)
+    # print((layer_pattern[layer_names[0]] != layer_pattern[layer_names[1]]).sum())
+    # exit()
+    max_p_r = -1
+
+    for k,p in pattern.items():
+        p_r = int(p.sum())
+        if p_r > max_p_r:
+            max_p_r = p_r
+    pattern_ones = max_p_r
+
+    for i, layer_name in enumerate(layer_names):
+        layer = dict(model.named_modules())[layer_name]
+        ztNAS_add_kernel_mask(model, layer, layer_name, is_pattern=True,
+                          pattern=pattern[i].to(args.device), pattern_ones=pattern_ones)
 
 
 def Kenel_Quantization(model,layer_names,quan_paras_dict):

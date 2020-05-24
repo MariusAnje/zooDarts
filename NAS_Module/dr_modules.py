@@ -97,9 +97,12 @@ def make_mixed(model,layer, layer_name,num_modules):
 class MixedBlock(nn.Module):
     def __init__(self, module, module_num):
         super(MixedBlock, self).__init__()
+        self.top = True
         moduleList = []
         for _ in range(module_num):
             m = deepcopy(module)
+            if isinstance(m, MixedBlock):
+                m.top = False
             moduleList.append(m)
                 
         self.moduleList = nn.ModuleList(moduleList)
@@ -179,7 +182,8 @@ class MixedNet(nn.Module):
         # TODO: bug here!!!!! incorrect if recursive MixedBlocks
         for name, module in self.model.named_modules():
             if isinstance(module, MixedBlock):
-                latency += module.get_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
+                if module.top:
+                    latency += module.get_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
         return latency
 
     def get_arch_params(self):
@@ -238,7 +242,7 @@ class MixedNet(nn.Module):
             if i == num_iters:
                 break
 
-    def train_fast(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters):
+    def train_fast(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters, args):
         self.model.train()
         running_loss = 0.0
         i = 0
@@ -264,7 +268,7 @@ class MixedNet(nn.Module):
             run_loader.set_description(f"{running_loss/i:.4f}, {latency:.4f}")
 
             if i%10 == 0:
-                torch.save(self.model.state_dict(), "dr_checkpoint.pt")
+                torch.save(self.model.state_dict(), args.checkpoint)
 
             if i == num_iters * 2:
                 break
@@ -273,7 +277,7 @@ class MixedNet(nn.Module):
         correct = 0
         total = 0
         ct = 0
-        self.model.eval()
+        # self.model.eval()
         with torch.no_grad():
             for inputs, labels in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -305,13 +309,15 @@ class MixedResNet18(MixedNet):
         # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
         # Kernel Pattern layers
         for name in layer_names:
+            module_dict = dict(model.named_modules())
             make_mixed(model, module_dict[name], name, 56)
             pattern = {}
             simple_names = []
             for i in range(56):
                 pattern[i] = pattern_space[i].reshape((3, 3))
                 simple_names.append(name + f".moduleList.{i}")
-            model_modify.Kernel_Patter(model, simple_names, pattern, args)
+            model_modify.Kernel_Patter_dr(model, simple_names, pattern, args)
+            # exit()
         
         """
         module_dict = dict(model.named_modules())
