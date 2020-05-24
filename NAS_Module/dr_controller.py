@@ -169,15 +169,15 @@ class Controller(object):
 
         if self.args.pretrained:
             training = False
-            state_dict = torch.load("dr_checkpoint.pt")
+            state_dict = torch.load(self.args.checkpoint)
             mixedModel.load_state_dict(state_dict)
 
         # print(model)
         if training:
             # mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000)
-            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, -1)
+            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 500, self.args)
 
-        mixedModel.modify_super(True)
+        mixedModel.modify_super(False)
         with tqdm(self.data_loader_test) as loader_test:
             mixedModel.test(loader_test, device)
             print(mixedModel.get_latency(device))

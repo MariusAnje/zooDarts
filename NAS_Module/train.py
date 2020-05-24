@@ -362,6 +362,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch Classification Training')
 
     parser.add_argument('--data-path', default='/mnt/weiwen/ImageNet', help='dataset')
+    parser.add_argument('--checkpoint', default='dr_checkpoint_new.pt', help='name of checkpoint')
     parser.add_argument('--device', default='cuda', help='device')
     # parser.add_argument('--device', default='cpu', help='device')
     parser.add_argument('-b', '--batch-size', default=32, type=int)
