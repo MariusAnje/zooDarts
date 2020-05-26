@@ -240,7 +240,7 @@ def init_distributed_mode(args):
     elif hasattr(args, "rank"):
         pass
     else:
-        print('Not using distributed mode')
+        # print('Not using distributed mode')
         args.distributed = False
         return
 

@@ -243,7 +243,7 @@ def ztNAS_cut_channel(model,conv_modify,bn_modifiy):
 
         if M != layer.out_channels or force:
             # OFM Filtering
-            print(layer_name,force,M, layer.out_channels)
+            # print(layer_name,force,M, layer.out_channels)
             W = model.state_dict()[layer_name + ".weight"][:]
             Idx = W.norm(dim=(2, 3)).sum(dim=1).topk(M)[1]
 

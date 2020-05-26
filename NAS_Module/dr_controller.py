@@ -126,10 +126,11 @@ class Controller(object):
         """
         with self.graph.as_default():
             self.sess.run(tf.global_variables_initializer())
-        """
+        
         step = 0
         total_rewards = 0
         child_network = np.array([[0] * self.num_para], dtype=np.int64)
+        """
         device = torch.device(self.args.device)
         
         space = self.nn1_search_space
@@ -142,7 +143,7 @@ class Controller(object):
         HW[5] += comm_point[0]
         HW[6] += comm_point[1]
         HW[7] += comm_point[2]
-        model = ss_resnet18.resnet_18_dr_pre_dna(model, pat_point, exp_point, ch_point, quant_point, self.args)
+        model = self.nn_model_helper.resnet_18_dr_pre_dna(model, pat_point, exp_point, ch_point, quant_point, self.args)
 
         # search non-preset hyperparameters: search space
         pattern_idx, k_expand, ch_list, q_list, comm_point = space[0:4], space[4], space[5:10], space[10:18], space[18:21]
@@ -155,14 +156,14 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, quant_layers)
+        mixedModel.get_ori_latency(device, quant_layers[4:5])
 
         # create DARTS model
-        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras, self.args)
+        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers[4:5], quant_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
-        arch_optimizer = optim.Adam(arch_params, lr = 1e-2)
+        arch_optimizer = optim.Adam(arch_params, lr = 1e-5)
         net_optimizer = optim.Adam(net_params, lr = 1e-5)
         criterion = nn.CrossEntropyLoss()
 
@@ -171,16 +172,34 @@ class Controller(object):
             training = False
             state_dict = torch.load(self.args.checkpoint)
             mixedModel.load_state_dict(state_dict)
+            """
+            print(mixedModel.get_arch_params())
+            for name, module in mixedModel.model.named_modules():
+                if name == quant_layers[4]:
+                    print(module)
+                    for m in module.moduleList:
+                        print(m.quan_paras)
+            """
 
         # print(model)
         if training:
             # mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000)
-            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 500, self.args)
+            mixedModel.modify_super(False)
+            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000, self.args)
+            # mixedModel.train_fast(self.data_loader, net_optimizer, net_optimizer, criterion, device, 200, self.args)
 
-        mixedModel.modify_super(False)
+
+        mixedModel.modify_super(True)
         with tqdm(self.data_loader_test) as loader_test:
-            mixedModel.test(loader_test, device)
-            print(mixedModel.get_latency(device))
+            acc = mixedModel.test(loader_test, device)
+            here_latency = mixedModel.get_latency(device)#.detach().cpu().numpy()
+            ori_latency = mixedModel.ori_latency
+            logging.info(f"acc: {acc:.4f}, train latency: {here_latency:.4f}, total: {ori_latency + here_latency:.4f}")
+            arch_params_ori = mixedModel.get_arch_params()
+            arch_params_print = []
+            for param in arch_params_ori:
+                arch_params_print.append(param.data.cpu().numpy())
+            logging.info(f"arch parameters: {arch_params_print}")
         exit()
 
         """
@@ -554,11 +573,19 @@ class Controller(object):
 seed = 0
 torch.manual_seed(seed)
 random.seed(seed)
-logging.basicConfig(stream=sys.stdout,
-                    level=logging.DEBUG,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+fileHandler = logging.FileHandler("log_dr_exp", mode = "a+")
+fileHandler.setLevel(logging.INFO)
+streamHandler = logging.StreamHandler()
+streamHandler.setLevel(logging.DEBUG)
+logging.basicConfig(
+                    handlers=[
+                                fileHandler,
+                                streamHandler],
+                    level= logging.DEBUG,
+                    format='%(asctime)s %(levelname)-8s %(message)s')
 
-print("Begin")
+logging.info("============== Begin ==============")
+# logging.debug("debug")
 controller = Controller()
 controller.global_train()
 

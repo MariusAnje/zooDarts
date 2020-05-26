@@ -15,6 +15,16 @@ import model_modify
 import copy_conv2d
 from tqdm import tqdm
 import dr_hw
+import numpy as np
+
+def avg_4_list(the_input:list, avg_size:int = 0):
+    if avg_size > 0:
+        the_input = the_input[-avg_size:]
+    # the_sum = 0.0
+    # for item in the_input:
+    #     the_sum += item
+    return torch.Tensor(the_input).mean()
+
 
 def get_last_attr_idx(model,seq):
 
@@ -110,7 +120,7 @@ class MixedBlock(nn.Module):
         self.sm = nn.Softmax(dim=-1)
         self.is_super = False
         self.input_size = 0
-        self.latency = None
+        self.latency = 0
         
     def modify_super(self, super:bool):
         self.is_super = super
@@ -128,17 +138,17 @@ class MixedBlock(nn.Module):
             for i in range(latency.size(0)):
                 latency[i] = self.moduleList[i].get_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
         
-        self.latency = latency
+        self.latency = latency.detach().cpu().numpy()
     
-    def get_latency(self, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device):
-        latency = self.latency
+    def get_latency(self):
         
         if self.is_super:
             i = self.mix.argmax()
-            return latency[i]
+            return self.latency[i]
         else:
             p = self.sm(self.mix)
-            return p.dot(latency)
+            # print(self.latency)
+            return p.dot(torch.Tensor(self.latency).to(p.device))
         
     def forward(self, x):
         self.input_size = x.size()
@@ -148,7 +158,9 @@ class MixedBlock(nn.Module):
             p = self.sm(self.mix)
             output = p[0] * self.moduleList[0](x)
             for i in range(1, len(self.moduleList)):
-                output += p[i] * self.moduleList[i](x)
+                o_item = self.moduleList[i](x)
+                # print()
+                output += p[i] * o_item
             return output
     
     def superEval(self, x):
@@ -171,7 +183,7 @@ class MixedNet(nn.Module):
 
     def init_latency(self, device):
         HW = self.HW
-        # TODO: bug here!!!!! incorrect if recursive MixedBlocks
+        # TODO: may be bug here!!!!!
         for name, module in self.model.named_modules():
             if isinstance(module, MixedBlock):
                 module.init_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
@@ -179,11 +191,11 @@ class MixedNet(nn.Module):
     def get_latency(self, device):
         latency = 0
         HW = self.HW
-        # TODO: bug here!!!!! incorrect if recursive MixedBlocks
+        # TODO: may be bug here!!!!!
         for name, module in self.model.named_modules():
-            if isinstance(module, MixedBlock):
+            if isinstance(module, MixedBlock) and module.top:
                 if module.top:
-                    latency += module.get_latency(HW[0], HW[1], HW[2], HW[3], HW[4], HW[5], HW[6], HW[7], device)
+                    latency += module.get_latency()
         return latency
 
     def get_arch_params(self):
@@ -244,6 +256,10 @@ class MixedNet(nn.Module):
 
     def train_fast(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters, args):
         self.model.train()
+        # self.model.eval()
+        
+        loss_list = []
+        avg_size = 100
         running_loss = 0.0
         i = 0
         run_loader = tqdm(loader)
@@ -254,19 +270,23 @@ class MixedNet(nn.Module):
             outputs = self.model(inputs)
             loss = criterion(outputs, labels)
             latency = self.get_latency(device)
+            # loss_list.append(loss.data.clone())
             running_loss += loss
             if i%2 == 0:
                 loss.backward()
                 net_optimizer.step()
             else:
-                loss += latency + self.ori_latency
+                loss += latency # + self.ori_latency
                 loss.backward()
+                # print(i, self.get_arch_params()[0].grad)
+                # for param in self.get_arch_params():
+                #     param.data -= param.grad.data * 1e-3
                 arch_optimizer.step()
             
 
             i += 1
             run_loader.set_description(f"{running_loss/i:.4f}, {latency:.4f}")
-
+            
             if i%10 == 0:
                 torch.save(self.model.state_dict(), args.checkpoint)
 
@@ -277,7 +297,7 @@ class MixedNet(nn.Module):
         correct = 0
         total = 0
         ct = 0
-        # self.model.eval()
+        self.model.eval()
         with torch.no_grad():
             for inputs, labels in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -287,7 +307,7 @@ class MixedNet(nn.Module):
                 correct += (predicted == labels).sum().item()
                 loader.set_description(f"{correct}, {total}")
 
-            print(f"{correct}, {total}, {ct}, acc: {correct/total}")
+            return correct / total
 
 
 class MixedResNet18(MixedNet):
@@ -322,21 +342,21 @@ class MixedResNet18(MixedNet):
     def create_mixed_quant(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
         model = self.model
         module_dict = dict(model.named_modules())
-        print(quant_layers)
-        print(quant_paras_ori)
-        print(len(quant_layers), len(quant_paras_ori))
-        exit()
         
         # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
         # Kernel Pattern layers
         for name in quant_layers:
-            make_mixed(model, module_dict[name], name, 56)
-            pattern = {}
-            simple_names = []
-            for i in range(56):
-                pattern[i] = pattern_space[i].reshape((3, 3))
-                simple_names.append(name + f".moduleList.{i}")
-            model_modify.Kenel_Quantization(model, quant_layers, quant_paras)
+            para = quant_paras_ori[name]
+            if len(para[1]) > 1:
+                make_mixed(model, module_dict[name], name, len(para[1]))
+                
+                quant_paras = {}
+                simple_names = []
+                for j in range(len(para[1])):
+                    simple_name = name + f".moduleList.{j}"
+                    quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                    simple_names.append(simple_name)
+                model_modify.Kenel_Quantization(model, simple_names, quant_paras)
         
 
         """
