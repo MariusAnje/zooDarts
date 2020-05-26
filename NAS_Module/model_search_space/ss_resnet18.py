@@ -82,19 +82,23 @@ def resnet_18_dr_pre_dna(model, pattern_idx, k_expand, ch_list, q_list, args):
     else:
         layer_kernel_inc = ["layer2.0.conv1","layer2.0.downsample.0"]
 
-    channel_cut_layers = [["layer1.0.conv1", "layer1.0.conv2", "layer1.0.bn1", (64, 64, 64)],
+    channel_cut_layers = [
+                          ["layer1.0.conv1", "layer1.0.conv2", "layer1.0.bn1", (64, 64, 64)],
                           ["layer1.1.conv1", "layer1.1.conv2", "layer1.1.bn1", (64, 64, 64)],
                           ["layer2.0.conv1", "layer2.0.conv2", "layer2.0.bn1", (64, 128, 128)],
                           ["layer2.1.conv1", "layer2.1.conv2", "layer2.1.bn1", (128, ch_list[0], 128)],
-                          ["layer3.0.conv1", "layer3.0.conv2", "layer3.0.bn1", (128, ch_list[1], 256)],
-                          ["layer3.1.conv1", "layer3.1.conv2", "layer3.1.bn1", (256, ch_list[2], 256)],
-                          ["layer4.0.conv1", "layer4.0.conv2", "layer4.0.bn1", (256, ch_list[3], 512)],
-                          ["layer4.1.conv1", "layer4.1.conv2", "layer4.1.bn1", (512, ch_list[4], 512)]]
+                        #   ["layer3.0.conv1", "layer3.0.conv2", "layer3.0.bn1", (128, ch_list[1], 256)],
+                        #   ["layer3.1.conv1", "layer3.1.conv2", "layer3.1.bn1", (256, ch_list[2], 256)],
+                        #   ["layer4.0.conv1", "layer4.0.conv2", "layer4.0.bn1", (256, ch_list[3], 512)],
+                        #   ["layer4.1.conv1", "layer4.1.conv2", "layer4.1.bn1", (512, ch_list[4], 512)]
+                        ]
 
-    quant_layers = ["layer3.0.conv1", "layer3.0.conv2",
+    quant_layers = [
+                    "layer3.0.conv1", "layer3.0.conv2",
                     "layer3.1.conv1", "layer3.1.conv2",
-                    "layer4.0.conv1", "layer4.0.conv2",
-                    "layer4.1.conv1", "layer4.1.conv2"]
+                    # "layer4.0.conv1", "layer4.0.conv2",
+                    # "layer4.1.conv1", "layer4.1.conv2"
+                    ]
     quan_paras = {}
     quan_paras["layer3.0.conv1"] = [0, q_list[0], True]
     quan_paras["layer3.0.conv2"] = [0, q_list[1], True]
@@ -109,7 +113,7 @@ def resnet_18_dr_pre_dna(model, pattern_idx, k_expand, ch_list, q_list, args):
     model_modify.Channel_Cut(model, channel_cut_layers)
     model_modify.Kernel_Patter(model, layer_names, pattern, args)
     model_modify.Kenel_Expand(model, layer_kernel_inc)
-    # model_modify.Kenel_Quantization(model, quant_layers, quan_paras)
+    model_modify.Kenel_Quantization(model, quant_layers, quan_paras)
 
     model_modify.Kernel_Patter(model, layer_names_77, parttern_77, args)
 

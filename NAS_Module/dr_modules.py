@@ -371,6 +371,47 @@ class MixedResNet18(MixedNet):
                     quant_paras[simple_name] = [para[0], para[1][j], para[2]]
                     simple_names.append(simple_name)
                 model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+    
+    def create_mixed_quant_prune(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
+        model = self.model
+        module_dict = dict(model.named_modules())
+        
+        # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
+        # Kernel Pattern layers
+        """
+        for name in quant_layers:
+            para = quant_paras_ori[name]
+            if len(para[1]) > 1:
+                make_mixed(model, module_dict[name], name, len(para[1]))
+                
+                quant_paras = {}
+                simple_names = []
+                for j in range(len(para[1])):
+                    simple_name = name + f".moduleList.{j}"
+                    quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                    simple_names.append(simple_name)
+                model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+        """
+        module_dict = dict(model.named_modules())
+        
+        layers_to_cut = []
+        for ch_list in channel_cut_layers:
+            sp = ch_list[0].split(".")
+            mixed_name = sp[0] + "." + sp[1]
+
+            make_mixed(model, module_dict[mixed_name], mixed_name, len(ch_list[3][1]))
+            module_dict = dict(model.named_modules())
+            print(module_dict[mixed_name])
+            exit()
+            
+            quant_paras = {}
+            simple_names = []
+            for j in range(len(para[1])):
+                simple_name = name + f".moduleList.{j}"
+                quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                simple_names.append(simple_name)
+            model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+
         
 
         """
