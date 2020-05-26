@@ -285,7 +285,7 @@ class MixedNet(nn.Module):
             
 
             i += 1
-            run_loader.set_description(f"{running_loss/i:.4f}, {latency:.4f}")
+            run_loader.set_description(f"{avg_4_list(loss_list, avg_size):.4f}, {latency:.4f}")
             
             if i%10 == 0:
                 torch.save(self.model.state_dict(), args.checkpoint)
