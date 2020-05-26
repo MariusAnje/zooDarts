@@ -254,44 +254,57 @@ class MixedNet(nn.Module):
             if i == num_iters:
                 break
 
-    def train_fast(self, loader, arch_optimizer, net_optimizer, criterion, device, num_iters, args):
+    def train_fast(self, loader, test_loader, arch_optimizer, net_optimizer, criterion, device, num_iters, args, logging):
         self.model.train()
         # self.model.eval()
         
+        logging.debug(f"caching test data")
+        cached_test_loader = []
+        for data in tqdm(test_loader, leave = False):
+            cached_test_loader.append(data)
+
         loss_list = []
         avg_size = 100
         running_loss = 0.0
         i = 0
-        run_loader = tqdm(loader)
-        for inputs, labels in run_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            net_optimizer.zero_grad()
-            arch_optimizer.zero_grad()
-            outputs = self.model(inputs)
-            loss = criterion(outputs, labels)
-            latency = self.get_latency(device)
-            # loss_list.append(loss.data.clone())
-            running_loss += loss
-            if i%2 == 0:
-                loss.backward()
-                net_optimizer.step()
-            else:
-                loss += latency # + self.ori_latency
-                loss.backward()
-                # print(i, self.get_arch_params()[0].grad)
-                # for param in self.get_arch_params():
-                #     param.data -= param.grad.data * 1e-3
-                arch_optimizer.step()
-            
+        with tqdm(loader) as run_loader:
+            for inputs, labels in run_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                net_optimizer.zero_grad()
+                arch_optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = criterion(outputs, labels)
+                latency = self.get_latency(device)
+                loss_list.append(loss.data.clone())
+                running_loss += loss
+                if i%2 == 0:
+                    loss.backward()
+                    net_optimizer.step()
+                else:
+                    loss += latency * 0.01 # + self.ori_latency
+                    loss.backward()
+                    # print(i, self.get_arch_params()[0].grad)
+                    # for param in self.get_arch_params():
+                    #     param.data -= param.grad.data * 1e-3
+                    arch_optimizer.step()
+                
 
-            i += 1
-            run_loader.set_description(f"{avg_4_list(loss_list, avg_size):.4f}, {latency:.4f}")
-            
-            if i%10 == 0:
-                torch.save(self.model.state_dict(), args.checkpoint)
+                i += 1
+                run_loader.set_description(f"{avg_4_list(loss_list, avg_size):.4f}, {latency:.4f}")
+                
+                if i%10 == 0:
+                    torch.save(self.model.state_dict(), args.checkpoint)
+                
+                if i % 500 == 0:
+                    self.modify_super(True)
+                    test_acc = self.test(cached_test_loader, device)
+                    logging.debug(f"test_acc: {test_acc}")
+                    torch.save(self.model.state_dict(), f"ep_{i}_" + args.checkpoint)
+                    self.modify_super(False)
+                    self.model.train()
 
-            if i == num_iters * 2:
-                break
+                if i == num_iters * 2:
+                    break
 
     def test(self, loader, device):
         correct = 0
@@ -299,15 +312,16 @@ class MixedNet(nn.Module):
         ct = 0
         self.model.eval()
         with torch.no_grad():
-            for inputs, labels in loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = self.model(inputs)
-                predicted = torch.argmax(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                loader.set_description(f"{correct}, {total}")
+            with tqdm(loader, leave = False) as loader:
+                for inputs, labels in loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    outputs = self.model(inputs)
+                    predicted = torch.argmax(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+                    loader.set_description(f"{correct}, {total}")
 
-            return correct / total
+                return correct / total
 
 
 class MixedResNet18(MixedNet):

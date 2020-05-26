@@ -156,10 +156,10 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, quant_layers[4:5])
+        mixedModel.get_ori_latency(device, quant_layers[4:])
 
         # create DARTS model
-        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers[4:5], quant_paras, self.args)
+        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers, quant_layers[4:], quant_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
@@ -185,21 +185,20 @@ class Controller(object):
         if training:
             # mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000)
             mixedModel.modify_super(False)
-            mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000, self.args)
+            mixedModel.train_fast(self.data_loader, self.data_loader_test, arch_optimizer, net_optimizer, criterion, device, -1, self.args, logging)
             # mixedModel.train_fast(self.data_loader, net_optimizer, net_optimizer, criterion, device, 200, self.args)
 
 
         mixedModel.modify_super(True)
-        with tqdm(self.data_loader_test) as loader_test:
-            acc = mixedModel.test(loader_test, device)
-            here_latency = mixedModel.get_latency(device)#.detach().cpu().numpy()
-            ori_latency = mixedModel.ori_latency
-            logging.info(f"acc: {acc:.4f}, train latency: {here_latency:.4f}, total: {ori_latency + here_latency:.4f}")
-            arch_params_ori = mixedModel.get_arch_params()
-            arch_params_print = []
-            for param in arch_params_ori:
-                arch_params_print.append(param.data.cpu().numpy())
-            logging.info(f"arch parameters: {arch_params_print}")
+        acc = mixedModel.test(self.data_loader_test, device)
+        here_latency = mixedModel.get_latency(device)#.detach().cpu().numpy()
+        ori_latency = mixedModel.ori_latency
+        logging.info(f"acc: {acc:.4f}, train latency: {here_latency:.4f}, total: {ori_latency + here_latency:.4f}")
+        arch_params_ori = mixedModel.get_arch_params()
+        arch_params_print = []
+        for param in arch_params_ori:
+            arch_params_print.append(param.data.cpu().numpy())
+        logging.info(f"arch parameters: {arch_params_print}")
         exit()
 
         """
