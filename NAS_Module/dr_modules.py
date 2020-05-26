@@ -371,6 +371,11 @@ class MixedResNet18(MixedNet):
                     quant_paras[simple_name] = [para[0], para[1][j], para[2]]
                     simple_names.append(simple_name)
                 model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+        
+        self.model = model
+        self.model.to(self.device)
+        self.model(torch.Tensor(1,3,224,224).to(self.device))
+        self.init_latency(self.device)
     
     def create_mixed_quant_prune(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
         model = self.model
