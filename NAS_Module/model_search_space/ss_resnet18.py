@@ -96,8 +96,8 @@ def resnet_18_dr_pre_dna(model, pattern_idx, k_expand, ch_list, q_list, args):
     quant_layers = [
                     "layer3.0.conv1", "layer3.0.conv2",
                     "layer3.1.conv1", "layer3.1.conv2",
-                    # "layer4.0.conv1", "layer4.0.conv2",
-                    # "layer4.1.conv1", "layer4.1.conv2"
+                    "layer4.0.conv1", "layer4.0.conv2",
+                    "layer4.1.conv1", "layer4.1.conv2"
                     ]
     quan_paras = {}
     quan_paras["layer3.0.conv1"] = [0, q_list[0], True]

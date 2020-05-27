@@ -378,59 +378,30 @@ class MixedResNet18(MixedNet):
         self.model(torch.Tensor(1,3,224,224).to(self.device))
         self.init_latency(self.device)
     
-    def create_mixed_quant_prune(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
+    def create_mixed_prune(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
         model = self.model
         module_dict = dict(model.named_modules())
         
-        # print(len(channel_cut_layers)*3 + len(quant_layers) + len(layer_names))
-        # Kernel Pattern layers
-        """
-        for name in quant_layers:
-            para = quant_paras_ori[name]
-            if len(para[1]) > 1:
-                make_mixed(model, module_dict[name], name, len(para[1]))
-                
-                quant_paras = {}
-                simple_names = []
-                for j in range(len(para[1])):
-                    simple_name = name + f".moduleList.{j}"
-                    quant_paras[simple_name] = [para[0], para[1][j], para[2]]
-                    simple_names.append(simple_name)
-                model_modify.Kenel_Quantization(model, simple_names, quant_paras)
-        """
-        module_dict = dict(model.named_modules())
-        
-        layers_to_cut = []
         for ch_list in channel_cut_layers:
+            layers_to_cut = []
             sp = ch_list[0].split(".")
             mixed_name = sp[0] + "." + sp[1]
 
             make_mixed(model, module_dict[mixed_name], mixed_name, len(ch_list[3][1]))
             module_dict = dict(model.named_modules())
-            print(module_dict[mixed_name])
-            exit()
-            
-            quant_paras = {}
-            simple_names = []
-            for j in range(len(para[1])):
-                simple_name = name + f".moduleList.{j}"
-                quant_paras[simple_name] = [para[0], para[1][j], para[2]]
-                simple_names.append(simple_name)
-            model_modify.Kenel_Quantization(model, simple_names, quant_paras)
-
-        
-
-        """
-        module_dict = dict(model.named_modules())
-        # Channel Cut
-        for item in channel_cut_layers[3:]:
-            for name in item[:3]:
-                make_mixed(model, module_dict[name], name, len(item[3][1]))
-        
-        module_dict = dict(model.named_modules())
-        for name in quant_layers:
-            make_mixed(model, module_dict[name], name, len(quan_paras[name][1]))
-        """
+            for i in range(len(ch_list[3][1])):
+                item = [
+                    mixed_name + f".moduleList.{i}." + ch_list[0].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[1].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[2].split(".")[2],
+                    (ch_list[3][0], ch_list[3][1][i], ch_list[3][2])
+                ]
+                layers_to_cut.append(item)
+            module_dict = dict(model.named_modules())
+            # print(module_dict[ layers_to_cut[0][0]])
+            # print(layers_to_cut)
+            # exit()
+            model_modify.Channel_Cut(model, layers_to_cut)
 
         self.model = model
         self.model.to(self.device)

@@ -159,7 +159,9 @@ class Controller(object):
         mixedModel.get_ori_latency(device, quant_layers[4:])
 
         # create DARTS model
-        mixedModel.create_mixed_quant(layer_names, layer_kernel_inc, channel_cut_layers[4:], quant_layers[4:], quant_paras, self.args)
+        mixedModel.to(torch.device("cpu"))
+        # mixedModel.device = torch.device("cpu")
+        mixedModel.create_mixed_prune(layer_names, layer_kernel_inc, channel_cut_layers[4:], quant_layers[4:], quant_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
