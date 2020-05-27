@@ -299,7 +299,8 @@ class MixedNet(nn.Module):
                     self.modify_super(True)
                     test_acc = self.test(cached_test_loader, device)
                     logging.debug(f"test_acc: {test_acc}")
-                    torch.save(self.model.state_dict(), f"ep_{i}_" + args.checkpoint)
+                    checkpoint_addr = args.checkpoint.split("/")
+                    torch.save(self.model.state_dict(), checkpoint_addr[0] + f"/ep_{i}_" + checkpoint_addr[1])
                     self.modify_super(False)
                     self.model.train()
 
