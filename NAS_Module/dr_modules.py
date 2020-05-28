@@ -511,6 +511,90 @@ class MixedResNet18(MixedNet):
         self.model(torch.Tensor(1,3,224,224).to(self.device))
         self.init_latency(self.device)
 
+    def create_mixed_three(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
+        model = self.model
+        module_dict = dict(model.named_modules())
+        
+        for ch_list in channel_cut_layers:
+            
+            layers_to_cut = []
+            sp = ch_list[0].split(".")
+            mixed_name = sp[0] + "." + sp[1]
+
+            make_mixed(model, module_dict[mixed_name], mixed_name, len(ch_list[3][1]))
+            module_dict = dict(model.named_modules())
+            for i in range(len(ch_list[3][1])):
+                item = [
+                    mixed_name + f".moduleList.{i}." + ch_list[0].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[1].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[2].split(".")[2],
+                    (ch_list[3][0], ch_list[3][1][i], ch_list[3][2])
+                ]
+                layers_to_cut.append(item)
+            module_dict = dict(model.named_modules())
+            model_modify.Channel_Cut(model, layers_to_cut)
+        
+        module_dict = dict(model.named_modules())
+        
+        for name in quant_layers:
+            sp = name.split(".")
+            mixed_name = sp[0] + "." + sp[1]
+            para = quant_paras_ori[name]
+            
+            if len(para[1]) > 1:
+                module = module_dict[mixed_name]
+                if isinstance(module, MixedBlock):
+                    for i in range(len(module.mix)):
+                        long_name = mixed_name + f".moduleList.{i}." + sp[2]
+                        make_mixed(model, module_dict[long_name], long_name, len(para[1]))
+                        module_dict = dict(model.named_modules())
+                        module_dict[long_name].top = False
+                        quant_paras = {}
+                        simple_names = []
+                        for j in range(len(para[1])):
+                            simple_name = long_name + f".moduleList.{j}"
+                            quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                            simple_names.append(simple_name)
+                        model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+
+
+                else:
+                    make_mixed(model, module_dict[name], name, len(para[1]))
+                    
+                    quant_paras = {}
+                    simple_names = []
+                    for j in range(len(para[1])):
+                        simple_name = name + f".moduleList.{j}"
+                        quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                        simple_names.append(simple_name)
+                    model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+
+        pat_points = [[23, 14, 8, 42], [22, 15, 7, 43]]
+        module_dict = dict(model.named_modules())
+        make_mixed(model, module_dict["layer1"], "layer1", len(pat_points))
+        make_mixed(model, module_dict["layer2"], "layer2", len(pat_points))
+        module_dict = dict(model.named_modules())
+        for i in range(len(pat_points)):
+            pattern_space = pattern_sets_generate_3((3, 3))
+            pattern = {}
+            j = 0
+            for idx in pat_points[i]:
+                pattern[j] = pattern_space[idx].reshape((3, 3))
+                j+=1
+            pattern_layer_names = []
+            for p_name in layer_names:
+                sp = p_name.split(".")
+                new_name = f"{sp[0]}.moduleList.{i}.{sp[1]}.{sp[2]}"
+                pattern_layer_names.append(new_name)
+            model_modify.Kernel_Patter(model, pattern_layer_names, pattern, args)
+            
+
+
+        self.model = model
+        self.model.to(self.device)
+        self.model(torch.Tensor(1,3,224,224).to(self.device))
+        self.init_latency(self.device)
+
 
 """    
 class Block(nn.Module):

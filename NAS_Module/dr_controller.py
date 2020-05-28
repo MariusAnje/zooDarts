@@ -156,19 +156,18 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, quant_layers[4:] + channel_cut_layers[4:])
+        mixedModel.get_ori_latency(device, quant_layers[4:] + channel_cut_layers[4:] + layer_names)
 
         # create DARTS model
         mixedModel.to(torch.device("cpu"))
         # mixedModel.device = torch.device("cpu")
-        mixedModel.create_mixed_cut_quant(layer_names, layer_kernel_inc, channel_cut_layers[4:], quant_layers[4:], quant_paras, self.args)
+        mixedModel.create_mixed_three(layer_names, layer_kernel_inc, channel_cut_layers[4:], quant_layers[4:], quant_paras, self.args)
         mixedModel.to(device)
         arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
         arch_optimizer = optim.Adam(arch_params, lr = 1e-5)
         net_optimizer = optim.Adam(net_params, lr = 1e-5)
         criterion = nn.CrossEntropyLoss()
-
 
         if self.args.pretrained:
             training = False
