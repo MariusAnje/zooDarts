@@ -127,11 +127,17 @@ class MixedBlock(nn.Module):
     
     def init_latency(self, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device):
         latency = torch.zeros_like(self.mix)
+        from torchvision.models.resnet import BasicBlock
         leaf = not isinstance(self.moduleList[0], MixedBlock)
         if leaf:
             for i in range(latency.size(0)):
                 if isinstance(self.moduleList[i], nn.Conv2d) or isinstance(self.moduleList[i], copy_conv2d.Conv2d_Custom):
                     latency[i] = dr_hw.get_performance_layer(self.moduleList[i], Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
+                elif isinstance(self.moduleList[i], BasicBlock):
+                    conv1 = self.moduleList[i].conv1
+                    conv2 = self.moduleList[i].conv2
+                    latency[i] += dr_hw.get_performance_layer(conv1, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
+                    latency[i] += dr_hw.get_performance_layer(conv2, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
                 else:
                     latency[i] = 0
         else:
@@ -281,7 +287,7 @@ class MixedNet(nn.Module):
                     loss.backward()
                     net_optimizer.step()
                 else:
-                    loss += latency * 0.01 # + self.ori_latency
+                    loss += latency * 1 # + self.ori_latency
                     loss.backward()
                     # print(i, self.get_arch_params()[0].grad)
                     # for param in self.get_arch_params():
@@ -378,7 +384,7 @@ class MixedResNet18(MixedNet):
         self.model(torch.Tensor(1,3,224,224).to(self.device))
         self.init_latency(self.device)
     
-    def create_mixed_prune(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
+    def create_mixed_cut(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
         model = self.model
         module_dict = dict(model.named_modules())
         
