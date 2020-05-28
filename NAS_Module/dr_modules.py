@@ -156,24 +156,36 @@ class MixedBlock(nn.Module):
     
     def get_latency(self):
         
-        if self.is_super:
-            i = self.mix.argmax()
-            return self.latency[i]
-        else:
-            p = self.sm(self.mix)
-            if not (isinstance(self.moduleList[0], MixedBlock) or isinstance(self.moduleList[0], BasicBlock)):
+        p = self.sm(self.mix)
+        if not (isinstance(self.moduleList[0], MixedBlock) or isinstance(self.moduleList[0], BasicBlock)):
+            if self.is_super:
+                i = self.mix.argmax()
+                return self.latency[i]
+            else:
                 return p.dot(torch.Tensor(self.latency).to(p.device))
-            elif isinstance(self.moduleList[0], MixedBlock):
-                latency = np.zeros(len(self.mix))
-                for i in range(len(self.mix)):
-                    latency[i] = self.moduleList[i].get_latency()
+        elif isinstance(self.moduleList[0], MixedBlock):
+            latency = np.zeros(len(self.mix))
+            for i in range(len(self.mix)):
+                latency[i] = self.moduleList[i].get_latency()
+            if self.is_super:
+                i = self.mix.argmax()
+                return latency[i]
+            else:
                 return p.dot(torch.Tensor(latency).to(p.device))
-            elif isinstance(self.moduleList[0], BasicBlock) and isinstance(self.moduleList[0].conv1, MixedBlock):
-                latency = np.zeros(len(self.mix))
-                for i in range(len(self.mix)):
-                    latency[i] += self.moduleList[i].conv1.get_latency()
-                    latency[i] += self.moduleList[i].conv2.get_latency()
+        elif isinstance(self.moduleList[0], BasicBlock) and isinstance(self.moduleList[0].conv1, MixedBlock):
+            latency = np.zeros(len(self.mix))
+            for i in range(len(self.mix)):
+                latency[i] += self.moduleList[i].conv1.get_latency()
+                latency[i] += self.moduleList[i].conv2.get_latency()
+            if self.is_super:
+                i = self.mix.argmax()
+                return latency[i]
+            else:
                 return p.dot(torch.Tensor(latency).to(p.device))
+        else:
+            if self.is_super:
+                i = self.mix.argmax()
+                return self.latency[i]
             else:
                 return p.dot(torch.Tensor(self.latency).to(p.device))
         

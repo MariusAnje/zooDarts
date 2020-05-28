@@ -156,7 +156,7 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, quant_layers[4:])
+        mixedModel.get_ori_latency(device, quant_layers[4:] + channel_cut_layers[4:])
 
         # create DARTS model
         mixedModel.to(torch.device("cpu"))
@@ -199,7 +199,7 @@ class Controller(object):
         arch_params_ori = mixedModel.get_arch_params()
         arch_params_print = []
         for param in arch_params_ori:
-            arch_params_print.append(param.data.cpu().numpy())
+            arch_params_print.append(param.data.argmax().item())
         logging.info(f"arch parameters: {arch_params_print}")
         exit()
 
