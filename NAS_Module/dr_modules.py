@@ -16,6 +16,7 @@ import copy_conv2d
 from tqdm import tqdm
 import dr_hw
 import numpy as np
+from torchvision.models.resnet import BasicBlock
 
 def avg_4_list(the_input:list, avg_size:int = 0):
     if avg_size > 0:
@@ -127,7 +128,6 @@ class MixedBlock(nn.Module):
     
     def init_latency(self, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device):
         latency = torch.zeros_like(self.mix)
-        from torchvision.models.resnet import BasicBlock
         leaf = not isinstance(self.moduleList[0], MixedBlock)
         if leaf:
             for i in range(latency.size(0)):
@@ -136,13 +136,21 @@ class MixedBlock(nn.Module):
                 elif isinstance(self.moduleList[i], BasicBlock):
                     conv1 = self.moduleList[i].conv1
                     conv2 = self.moduleList[i].conv2
-                    latency[i] += dr_hw.get_performance_layer(conv1, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
-                    latency[i] += dr_hw.get_performance_layer(conv2, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
+                    if isinstance(conv1, MixedBlock):
+                        conv1.init_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
+                        # latency[i] += conv1.get_
+                    else:
+                        latency[i] += dr_hw.get_performance_layer(conv1, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
+                    if isinstance(conv2, MixedBlock):
+                        conv2.init_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
+                    else:
+                        latency[i] += dr_hw.get_performance_layer(conv2, Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p,device, size = self.input_size)
                 else:
                     latency[i] = 0
         else:
             for i in range(latency.size(0)):
-                latency[i] = self.moduleList[i].get_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
+                self.moduleList[i].init_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
+                # latency[i] = self.moduleList[i].get_latency(Tm, Tn, Tr, Tc, Tk, W_p, I_p, O_p, device)
         
         self.latency = latency.detach().cpu().numpy()
     
@@ -153,8 +161,21 @@ class MixedBlock(nn.Module):
             return self.latency[i]
         else:
             p = self.sm(self.mix)
-            # print(self.latency)
-            return p.dot(torch.Tensor(self.latency).to(p.device))
+            if not (isinstance(self.moduleList[0], MixedBlock) or isinstance(self.moduleList[0], BasicBlock)):
+                return p.dot(torch.Tensor(self.latency).to(p.device))
+            elif isinstance(self.moduleList[0], MixedBlock):
+                latency = np.zeros(len(self.mix))
+                for i in range(len(self.mix)):
+                    latency[i] = self.moduleList[i].get_latency()
+                return p.dot(torch.Tensor(latency).to(p.device))
+            elif isinstance(self.moduleList[0], BasicBlock) and isinstance(self.moduleList[0].conv1, MixedBlock):
+                latency = np.zeros(len(self.mix))
+                for i in range(len(self.mix)):
+                    latency[i] += self.moduleList[i].conv1.get_latency()
+                    latency[i] += self.moduleList[i].conv2.get_latency()
+                return p.dot(torch.Tensor(latency).to(p.device))
+            else:
+                return p.dot(torch.Tensor(self.latency).to(p.device))
         
     def forward(self, x):
         self.input_size = x.size()
@@ -410,6 +431,70 @@ class MixedResNet18(MixedNet):
             model_modify.Channel_Cut(model, layers_to_cut)
 
         self.model = model
+        self.model.to(self.device)
+        self.model(torch.Tensor(1,3,224,224).to(self.device))
+        self.init_latency(self.device)
+    
+    def create_mixed_cut_quant(self, layer_names, layer_kernel_inc, channel_cut_layers, quant_layers, quant_paras_ori, args):
+        model = self.model
+        module_dict = dict(model.named_modules())
+        
+        for ch_list in channel_cut_layers:
+            
+            layers_to_cut = []
+            sp = ch_list[0].split(".")
+            mixed_name = sp[0] + "." + sp[1]
+
+            make_mixed(model, module_dict[mixed_name], mixed_name, len(ch_list[3][1]))
+            module_dict = dict(model.named_modules())
+            for i in range(len(ch_list[3][1])):
+                item = [
+                    mixed_name + f".moduleList.{i}." + ch_list[0].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[1].split(".")[2],
+                    mixed_name + f".moduleList.{i}." + ch_list[2].split(".")[2],
+                    (ch_list[3][0], ch_list[3][1][i], ch_list[3][2])
+                ]
+                layers_to_cut.append(item)
+            module_dict = dict(model.named_modules())
+            model_modify.Channel_Cut(model, layers_to_cut)
+        
+        module_dict = dict(model.named_modules())
+        
+        for name in quant_layers:
+            sp = name.split(".")
+            mixed_name = sp[0] + "." + sp[1]
+            para = quant_paras_ori[name]
+            
+            if len(para[1]) > 1:
+                module = module_dict[mixed_name]
+                if isinstance(module, MixedBlock):
+                    for i in range(len(module.mix)):
+                        long_name = mixed_name + f".moduleList.{i}." + sp[2]
+                        make_mixed(model, module_dict[long_name], long_name, len(para[1]))
+                        module_dict = dict(model.named_modules())
+                        module_dict[long_name].top = False
+                        quant_paras = {}
+                        simple_names = []
+                        for j in range(len(para[1])):
+                            simple_name = long_name + f".moduleList.{j}"
+                            quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                            simple_names.append(simple_name)
+                        model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+
+
+                else:
+                    make_mixed(model, module_dict[name], name, len(para[1]))
+                    
+                    quant_paras = {}
+                    simple_names = []
+                    for j in range(len(para[1])):
+                        simple_name = name + f".moduleList.{j}"
+                        quant_paras[simple_name] = [para[0], para[1][j], para[2]]
+                        simple_names.append(simple_name)
+                    model_modify.Kenel_Quantization(model, simple_names, quant_paras)
+
+        self.model = model
+        # print(self.model)
         self.model.to(self.device)
         self.model(torch.Tensor(1,3,224,224).to(self.device))
         self.init_latency(self.device)
