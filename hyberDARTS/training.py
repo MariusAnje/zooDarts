@@ -59,7 +59,7 @@ if __name__ == "__main__":
     archOptimizer = optim.Adam(archParams,lr = 1e-3)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
-    device = torch.device("cuda:0")
+    device = torch.device(args.device)
     superModel.to(device)
 
     for i in range(args.train_epochs):
