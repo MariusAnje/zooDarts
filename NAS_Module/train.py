@@ -215,19 +215,22 @@ def main(args, dna, ori_HW, data_loader, data_loader_test, ori_HW_dconv=[]):
         model = torch.hub.load('mit-han-lab/ProxylessNAS', args.model)
     elif "FBNET" in args.model:
         model = torch.hub.load('rwightman/gen-efficientnet-pytorch', 'fbnetc_100')
+    elif args.model == "newresnet18":
+        model =torchvision.models.__dict__["resnet18"](pretrained=args.pretrained)
     else:
         model =torchvision.models.__dict__[args.model](pretrained=args.pretrained)
 
 
     # model = torchvision.models.__dict__[args.model](pretrained=args.pretrained)
 
-    if args.model == "resnet18":
+    if (args.model == "resnet18") or (args.model == "newresnet18"):
         pat_point, exp_point, ch_point, quant_point, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
         HW = copy.deepcopy(ori_HW)
         HW[5] += comm_point[0]
         HW[6] += comm_point[1]
         HW[7] += comm_point[2]
         model = ss_resnet18.resnet_18_space(model, pat_point, exp_point, ch_point, quant_point, args)
+
     elif args.model == "mnasnet0_5":
         # pattern_3_3_idx = dna[0:4]
         # pattern_5_5_idx = dna[4:8]
@@ -281,7 +284,7 @@ def main(args, dna, ori_HW, data_loader, data_loader_test, ori_HW_dconv=[]):
 
     if args.hw_test:
         print("HW_Test")
-        if args.model == "resnet18":
+        if args.model == "resnet18" or args.model == "newresnet18":
             if HW[5] + HW[6] + HW[7] <= int(HW_constraints["r_Ports_BW"] / HW_constraints["BITWIDTH"]):
                 total_lat = bottleneck_conv_only.get_performance(model, HW[0], HW[1], HW[2], HW[3],
                                                                  HW[4], HW[5], HW[6], HW[7], device)
@@ -363,6 +366,9 @@ def parse_args():
 
     parser.add_argument('--data-path', default='/mnt/weiwen/ImageNet', help='dataset')
     parser.add_argument('--checkpoint', default='checkpoints/dr_checkpoint_new.pt', help='name of checkpoint')
+    parser.add_argument("--random", help="no rl", action="store_true", )
+
+
     parser.add_argument('--device', default='cuda', help='device')
     # parser.add_argument('--device', default='cpu', help='device')
     parser.add_argument('-b', '--batch-size', default=32, type=int)
@@ -405,6 +411,8 @@ def parse_args():
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('--lr', default=0.1, type=float, help='initial learning rate')
+    parser.add_argument('--archLr', default=1e-5, type=float, help='initial learning rate for architecture probabilities')
+    parser.add_argument('--netLr', default=1e-5, type=float, help='initial learning rate for net parameters')
     parser.add_argument("--test-only", dest="test_only", help="Only test the model", action="store_true", )
     parser.add_argument("--rl", dest="reinfoce", help="execute reinforcement leraning", action="store_true", )
     parser.add_argument('--train_stop_batch', default=100, type=int, metavar='N',help='number of batch to terminate in training')

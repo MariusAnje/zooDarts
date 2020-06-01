@@ -293,7 +293,7 @@ class MixedNet(nn.Module):
             if i == num_iters:
                 break
 
-    def train_fast(self, loader, test_loader, arch_optimizer, net_optimizer, criterion, device, num_iters, args, logging):
+    def train_fast(self, loader, test_loader, arch_optimizer, net_optimizer, criterion, device, log_iters, args, logging, halt_iters = -1):
         self.model.train()
         # self.model.eval()
         
@@ -334,34 +334,70 @@ class MixedNet(nn.Module):
                 if i%10 == 0:
                     torch.save(self.model.state_dict(), args.checkpoint)
                 
-                if i % 500 == 0:
-                    self.modify_super(True)
-                    test_acc = self.test(cached_test_loader, device)
-                    logging.debug(f"test_acc: {test_acc}")
+                if i % log_iters == 0:
                     checkpoint_addr = args.checkpoint.split("/")
                     torch.save(self.model.state_dict(), checkpoint_addr[0] + f"/ep_{i}_" + checkpoint_addr[1])
+
+                    arch_params_ori = self.get_arch_params()
+                    arch_params_print = []
+                    for param in arch_params_ori:
+                        arch_params_print.append(param.data.argmax().item())
+                    logging.info(f"iter: {i:-6d}, arch parameters: {arch_params_print}")
+                    self.modify_super(True)
+                    test_acc = self.test(cached_test_loader, device)
+                    latency = self.get_latency(device)
+                    logging.info(f"              SELECTED: test_acc: {test_acc:.4f}, latency: {latency + self.ori_latency:.4f}")
+                    self.modify_super(False)
+                    test_acc = self.test(cached_test_loader, device)
+                    latency = self.get_latency(device)
+                    logging.info(f"              SUPERNET: test_acc: {test_acc:.4f}, latency: {latency + self.ori_latency:.4f}")
                     self.modify_super(False)
                     self.model.train()
 
-                if i == num_iters * 2:
+                if i == halt_iters * 2:
                     break
 
+    def finetune(self, loader, net_optimizer, criterion, device, args, logging):
+        self.model.train()
+
+        loss_list = []
+        avg_size = 100
+        running_loss = 0.0
+        i = 0
+        with tqdm(loader) as run_loader:
+            for inputs, labels in run_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                net_optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = criterion(outputs, labels)
+                latency = self.get_latency(device)
+                loss_list.append(loss.data.clone())
+                running_loss += loss
+                loss.backward()
+                net_optimizer.step()
+                
+                i += 1
+                run_loader.set_description(f"{avg_4_list(loss_list, avg_size):.4f}")
+                
+                if i%10 == 0:
+                    torch.save(self.model.state_dict(), args.checkpoint)
+    
     def test(self, loader, device):
         correct = 0
         total = 0
         ct = 0
         self.model.eval()
         with torch.no_grad():
-            with tqdm(loader, leave = False) as loader:
-                for inputs, labels in loader:
-                    inputs, labels = inputs.to(device), labels.to(device)
-                    outputs = self.model(inputs)
-                    predicted = torch.argmax(outputs.data, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    loader.set_description(f"{correct}, {total}")
+            # with tqdm(loader, leave = False) as loader:
+            for inputs, labels in loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = self.model(inputs)
+                predicted = torch.argmax(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                # loader.set_description(f"{correct}, {total}")
 
-                return correct / total
+            return correct / total
 
 
 class MixedResNet18(MixedNet):
@@ -569,7 +605,19 @@ class MixedResNet18(MixedNet):
                         simple_names.append(simple_name)
                     model_modify.Kenel_Quantization(model, simple_names, quant_paras)
 
-        pat_points = [[23, 14, 8, 42], [22, 15, 7, 43]]
+        pat_points = [
+                        [23, 14,  8, 42], 
+                        [31, 24, 10, 13],
+                        [50, 27,  5, 23],
+                        [13, 16, 50,  6],
+                        [14,  9,  3, 30],
+                        [47, 15, 21, 38],
+                        [22, 18, 47,  9],
+                        [55, 45, 35, 39],
+                        [34, 38, 16, 32],
+                        [24, 15, 36, 14],
+                        [46, 31, 41, 22]
+                      ]
         module_dict = dict(model.named_modules())
         make_mixed(model, module_dict["layer1"], "layer1", len(pat_points))
         make_mixed(model, module_dict["layer2"], "layer2", len(pat_points))

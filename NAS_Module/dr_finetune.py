@@ -122,6 +122,8 @@ class Controller(object):
         import torch.optim as optim
         from tqdm import tqdm
         from model_search_space import ss_resnet18
+        sys.path.append("../Interface")
+        import bottleneck_conv_only
 
         """
         with self.graph.as_default():
@@ -134,16 +136,38 @@ class Controller(object):
         device = torch.device(self.args.device)
         
         space = self.nn1_search_space
+        new_stuff = [
+                        [23, 14,  8, 42], 
+                        [31, 24, 10, 13],
+                        [50, 27,  5, 23],
+                        [13, 16, 50,  6],
+                        [14,  9,  3, 30],
+                        [47, 15, 21, 38],
+                        [22, 18, 47,  9],
+                        [55, 45, 35, 39],
+                        [34, 38, 16, 32],
+                        [24, 15, 36, 14],
+                        [46, 31, 41, 22]
+                    ]
+        space = [new_stuff] + list(space)[4:]
         model = torchvision.models.__dict__[self.args.model](pretrained=True)
         
-        # use preset DNAs to create pruned model
+        # DNA found by weiwen
         dna = [23, 14, 8, 42, 0, 128, 256, 256, 480, 496, 16, 16, 16, 16, 8, 8, 8, 8, 2, -1, 0]
+        # use preset DNAs to create pruned model
+        found_paras = [0, 4, 1, 1, 3, 0, 1, 0, 1, 0, 1, 0, 1, 3, 1, 0, 1, 0, 1, 0, 1, 0]
+        m_1 = found_paras[4]
+        m_1 = found_paras[5 + m_1 * 2: 5 + m_1 * 2 + 2]
+        m_2 = found_paras[13]
+        m_2 = found_paras[14 + m_2 * 2: 14 + m_2 * 2 + 2]
+        dna = space[0][found_paras[0]] + [0, 128, space[3][found_paras[2]], space[4][found_paras[3]], space[5][found_paras[4]], space[6][found_paras[13]], 16, 16, 16, 16, space[11][m_1[0]], space[12][m_1[1]], space[13][m_2[0]], space[14][m_2[1]], 2, -1, 0]
+        logging.info(f"Found DNA: {dna}")
         pat_point, exp_point, ch_point, quant_point, comm_point = dna[0:4], dna[4], dna[5:10], dna[10:18], dna[18:21]
         HW = copy.deepcopy(self.HW)
         HW[5] += comm_point[0]
         HW[6] += comm_point[1]
         HW[7] += comm_point[2]
-        model = self.nn_model_helper.resnet_18_dr_pre_dna(model, pat_point, exp_point, ch_point, quant_point, self.args)
+        model = self.nn_model_helper.resnet_18_dr_finetune(model, pat_point, exp_point, ch_point, quant_point, self.args)
 
         # search non-preset hyperparameters: search space
         pattern_idx, k_expand, ch_list, q_list, comm_point = space[0:4], space[4], space[5:10], space[10:18], space[18:21]
@@ -156,56 +180,20 @@ class Controller(object):
 
         #calculate original latency
         mixedModel.to(device)
-        mixedModel.get_ori_latency(device, quant_layers[4:] + channel_cut_layers[4:] + layer_names)
+        mixedModel.get_ori_latency(device, [])
+        lat = bottleneck_conv_only.get_performance(model, HW[0], HW[1], HW[2], HW[3],
+                                                                 HW[4], HW[5], HW[6], HW[7], device)
+        print(f"{lat:.4f}")
 
-        # create DARTS model
-        mixedModel.to(torch.device("cpu"))
-        # mixedModel.device = torch.device("cpu")
-        mixedModel.create_mixed_three(layer_names, layer_kernel_inc, channel_cut_layers[4:], quant_layers[4:], quant_paras, self.args)
-        mixedModel.to(device)
-        arch_params = mixedModel.get_arch_params()
         net_params = mixedModel.get_net_params()
-        arch_optimizer = optim.Adam(arch_params, lr = self.args.archLr)
         net_optimizer = optim.Adam(net_params, lr = self.args.netLr)
         criterion = nn.CrossEntropyLoss()
+        for i in range(10):
+            mixedModel.finetune(self.data_loader, net_optimizer, criterion, device, self.args, logging)
 
-        for name, module in mixedModel.model.named_modules():
-            if isinstance(module, dr_modules.MixedBlock):
-                print(name)
-        exit()
-
-
-        if self.args.pretrained:
-            training = False
-            state_dict = torch.load(self.args.checkpoint)
-            mixedModel.load_state_dict(state_dict)
-            """
-            print(mixedModel.get_arch_params())
-            for name, module in mixedModel.model.named_modules():
-                if name == quant_layers[4]:
-                    print(module)
-                    for m in module.moduleList:
-                        print(m.quan_paras)
-            """
-
-        # print(model)
-        if training:
-            # mixedModel.train_fast(self.data_loader, arch_optimizer, net_optimizer, criterion, device, 2000)
-            mixedModel.modify_super(False)
-            mixedModel.train_fast(self.data_loader, self.data_loader_test, arch_optimizer, net_optimizer, criterion, device, 500, self.args, logging)
-            # mixedModel.train_fast(self.data_loader, net_optimizer, net_optimizer, criterion, device, 200, self.args)
-
-
-        mixedModel.modify_super(True)
-        acc = mixedModel.test(self.data_loader_test, device)
-        here_latency = mixedModel.get_latency(device)#.detach().cpu().numpy()
-        ori_latency = mixedModel.ori_latency
-        logging.info(f"acc: {acc:.4f}, train latency: {here_latency:.4f}, total: {ori_latency + here_latency:.4f}")
-        arch_params_ori = mixedModel.get_arch_params()
-        arch_params_print = []
-        for param in arch_params_ori:
-            arch_params_print.append(param.data.argmax().item())
-        logging.info(f"arch parameters: {arch_params_print}")
+            acc = mixedModel.test(self.data_loader_test, device)
+            ori_latency = mixedModel.ori_latency
+            logging.info(f"epoch {i}: acc: {acc:.4f}, latency: {ori_latency:.4f}")
         exit()
 
         """
@@ -250,7 +238,7 @@ class Controller(object):
 seed = 0
 torch.manual_seed(seed)
 random.seed(seed)
-fileHandler = logging.FileHandler("log_dr_exp_three", mode = "a+")
+fileHandler = logging.FileHandler("log_finetune", mode = "a+")
 fileHandler.setLevel(logging.INFO)
 streamHandler = logging.StreamHandler()
 streamHandler.setLevel(logging.DEBUG)
