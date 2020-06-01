@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('--pretrained', action="store_true")
     parser.add_argument('--train_epochs', action="store", type = int, default = 10)
     parser.add_argument('--log_filename', action="store", type = str, default = "log")
+    parser.add_argument('--device', action="store", type = str, default = "cuda:0")
     args = parser.parse_args()
 
     fileHandler = logging.FileHandler(args.log_filename, mode = "a+")
