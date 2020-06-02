@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
+import copy
 
 class LayerBlock(nn.Module):
     """
@@ -98,6 +99,51 @@ class SuperNet(nn.Module):
             if isinstance(module, MixedBlock):
                 module.is_super = is_super
     
+    def get_unrolled_model_grad(self, plus:bool, net_grads_f, arch_inputs, arch_labels, criterion, eps):
+        unrolled_model = copy.deepcopy(self.model)
+        if plus:
+            signer = 1
+        else:
+            signer = -1
+        i = 0
+        for name, param in unrolled_model.named_parameters():
+            if name.find("mix") == -1:
+                try:
+                    param.data += (eps * net_grads_f[i] * signer)
+                except:
+                    pass
+                i += 1
+        arch_outputs = unrolled_model(arch_inputs)
+        arch_loss = criterion(arch_outputs, arch_labels)
+        arch_loss.backward()
+        arch_grads_s = []
+        for name, param in unrolled_model.named_parameters():
+            if name.find("mix") != -1:
+                arch_grads_s.append(param.grad.data)
+        return arch_grads_s
+
+    
+    def unroll(self, arch_loader, arch_optimizer, net_optimizer, criterion, device):
+        arch_data = next(iter(arch_loader))
+        eps = 1e-5
+        net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_inputs, arch_labels = arch_data
+        arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
+        arch_outputs = self.model(arch_inputs)
+        arch_loss = criterion(arch_outputs, arch_labels)
+        arch_loss.backward()
+        arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
+        net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
+        net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_grads_s_p = self.get_unrolled_model_grad(True, net_grads_f, arch_inputs, arch_labels, criterion, eps)
+        net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_grads_s_n = self.get_unrolled_model_grad(False, net_grads_f, arch_inputs, arch_labels, criterion, eps)
+        for i, param in enumerate(self.get_arch_params()):
+            param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/eps
+
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
         self.model.train()
@@ -111,6 +157,7 @@ class SuperNet(nn.Module):
             for inputs, labels in run_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 net_optimizer.zero_grad()
+                arch_optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = criterion(outputs, labels)
                 loss_list.append(loss.data.clone())
@@ -120,13 +167,15 @@ class SuperNet(nn.Module):
                 i += 1
                 run_loader.set_description(f"{running_loss/i:.4f}")
                 
-                arch_data = next(iter(arch_loader))
-                arch_optimizer.zero_grad()
-                arch_inputs, arch_labels = arch_data
-                arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
-                arch_outputs = self.model(arch_inputs)
-                arch_loss = criterion(arch_outputs, arch_labels)
-                arch_loss.backward()
+                # arch_data = next(iter(arch_loader))
+                # net_optimizer.zero_grad()
+                # arch_optimizer.zero_grad()
+                # arch_inputs, arch_labels = arch_data
+                # arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
+                # arch_outputs = self.model(arch_inputs)
+                # arch_loss = criterion(arch_outputs, arch_labels)
+                # arch_loss.backward()
+                self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
                 arch_optimizer.step()
     
     def warm(self, net_loader, net_optimizer, criterion, device):

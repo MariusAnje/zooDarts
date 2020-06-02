@@ -62,7 +62,7 @@ if __name__ == "__main__":
     device = torch.device(args.device)
     superModel.to(device)
 
-    for i in range(2):
+    for i in range(0):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")
