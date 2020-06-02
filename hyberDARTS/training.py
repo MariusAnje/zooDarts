@@ -56,7 +56,7 @@ if __name__ == "__main__":
     superModel.get_model(SuperCIFARNet())
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
-    archOptimizer = optim.Adam(archParams,lr = 0.1)
+    archOptimizer = optim.Adam(archParams,lr = 1e-3)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     device = torch.device(args.device)
