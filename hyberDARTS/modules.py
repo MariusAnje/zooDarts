@@ -93,10 +93,10 @@ class SuperNet(nn.Module):
         return net_params
 
     def modify_super(self, is_super):
+        self.is_super = is_super
         for module in self.model.modules():
             if isinstance(module, MixedBlock):
-                module.is_uper = is_super
-                self.is_super = is_super
+                module.is_super = is_super
     
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
@@ -129,6 +129,27 @@ class SuperNet(nn.Module):
                 arch_loss.backward()
                 arch_optimizer.step()
     
+    def warm(self, net_loader, net_optimizer, criterion, device):
+        self.model.train()
+
+        loss_list = []
+        avg_size = 100
+        running_loss = 0.0
+        i = 0
+        # arch_loader = iter(arch_loader)
+        with tqdm(net_loader) as run_loader:
+            for inputs, labels in run_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                net_optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = criterion(outputs, labels)
+                loss_list.append(loss.data.clone())
+                running_loss += loss
+                loss.backward()
+                net_optimizer.step()
+                i += 1
+                run_loader.set_description(f"{running_loss/i:.4f}")
+    
     def test(self, loader, device):
         correct = 0
         total = 0
@@ -144,8 +165,6 @@ class SuperNet(nn.Module):
 
             return correct / total
 
-    def forward(self, x):
-        return self.model(x)
 
         
 if __name__ == "__main__":

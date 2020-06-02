@@ -8,7 +8,7 @@ import torch.optim as optim
 # tqdm is imported for better visualization
 import tqdm
 from models import SuperCIFARNet
-from modules import SuperNet
+from modules import SuperNet, MixedBlock
 import logging
 import os
 
@@ -56,18 +56,25 @@ if __name__ == "__main__":
     superModel.get_model(SuperCIFARNet())
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
-    archOptimizer = optim.Adam(archParams,lr = 1e-3)
+    archOptimizer = optim.Adam(archParams,lr = 0.1)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     device = torch.device(args.device)
     superModel.to(device)
 
+    for i in range(2):
+        superModel.modify_super(True)
+        superModel.warm(trainLoader, netOptimizer, criterion, device)
+        logging.debug(f"           arch: {superModel.get_arch_params()}")
+
     for i in range(args.train_epochs):
         superModel.modify_super(True)
         superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+        superAcc = superModel.test(testloader, device)
         superModel.modify_super(False)
         acc = superModel.test(testloader, device)
-        logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}")
+        logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
         logging.info(f"           arch: {superModel.get_module_choice()}")
+        # logging.debug(superModel.get_arch_params())
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
 

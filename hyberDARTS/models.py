@@ -10,7 +10,7 @@ class SuperCIFARNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperCIFARNet, self).__init__()
         # modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        modules = ["CONV1","CONV3", "CONV5"]
+        modules = ["CONV7","CONV3", "CONV5"]
         norm = True
         self.block1 = MixedBlock(self.createConvList(modules, 3, 128, norm))
         self.block2 = MixedBlock(self.createConvList(modules, 128, 128, norm))
@@ -41,19 +41,6 @@ class SuperCIFARNet(nn.Module):
         x = self.pool(x)
         x = self.block5(x)
         x = self.block6(x)
-        x = self.lastPool(x)
-        x = self.classifier(x.view(-1, 512*4*4))
-        return x
-    
-    def superEval(self, x):
-        x = self.block1.superEval(x)
-        x = self.block2.superEval(x)
-        x = self.pool(x)
-        x = self.block3.superEval(x)
-        x = self.block4.superEval(x)
-        x = self.pool(x)
-        x = self.block5.superEval(x)
-        x = self.block6.superEval(x)
         x = self.lastPool(x)
         x = self.classifier(x.view(-1, 512*4*4))
         return x
