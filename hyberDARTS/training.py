@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_epochs', action="store", type = int, default = 10)
     parser.add_argument('--log_filename', action="store", type = str, default = "log")
     parser.add_argument('--device', action="store", type = str, default = "cuda:0")
+    parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
     args = parser.parse_args()
 
     fileHandler = logging.FileHandler(args.log_filename, mode = "a+")
@@ -34,6 +35,9 @@ if __name__ == "__main__":
                         level= logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s')
 
+    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+    logging.info(args.ex_info)
+    
     if os.name == "nt":
         dataPath = "~/testCode/data"
     else:
@@ -56,7 +60,7 @@ if __name__ == "__main__":
     superModel.get_model(SuperCIFARNet())
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
-    archOptimizer = optim.Adam(archParams,lr = 1e-3)
+    archOptimizer = optim.Adam(archParams,lr = 0.1)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     device = torch.device(args.device)
@@ -75,6 +79,6 @@ if __name__ == "__main__":
         acc = superModel.test(testloader, device)
         logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
         logging.info(f"           arch: {superModel.get_module_choice()}")
-        # logging.debug(superModel.get_arch_params())
+        logging.debug(superModel.get_arch_params())
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
 

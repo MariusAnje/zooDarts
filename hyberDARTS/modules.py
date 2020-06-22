@@ -142,7 +142,7 @@ class SuperNet(nn.Module):
         arch_optimizer.zero_grad()
         arch_grads_s_n = self.get_unrolled_model_grad(False, net_grads_f, arch_inputs, arch_labels, criterion, eps)
         for i, param in enumerate(self.get_arch_params()):
-            param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/eps
+            param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
 
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):

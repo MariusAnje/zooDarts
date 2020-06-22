@@ -9,21 +9,27 @@ from modules import LayerBlock, MixedBlock
 class SuperCIFARNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperCIFARNet, self).__init__()
-        # modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        modules = ["CONV7","CONV3", "CONV5"]
+        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        # modules = ["CONV1","CONV3", "CONV5"]
         norm = True
-        self.block1 = MixedBlock(self.createConvList(modules, 3, 128, norm))
-        self.block2 = MixedBlock(self.createConvList(modules, 128, 128, norm))
-        self.block3 = MixedBlock(self.createConvList(modules, 128, 256, norm))
-        self.block4 = MixedBlock(self.createConvList(modules, 256, 256, norm))
-        self.block5 = MixedBlock(self.createConvList(modules, 256, 512, norm))
-        self.block6 = MixedBlock(self.createConvList(modules, 512, 512, norm))
+        # self.block1 = MixedBlock(self.createConvList(modules, 3, 128, norm))
+        # self.block2 = MixedBlock(self.createConvList(modules, 128, 128, norm))
+        # self.block3 = MixedBlock(self.createConvList(modules, 128, 256, norm))
+        # self.block4 = MixedBlock(self.createConvList(modules, 256, 256, norm))
+        # self.block5 = MixedBlock(self.createConvList(modules, 256, 512, norm))
+        # self.block6 = MixedBlock(self.createConvList(modules, 512, 512, norm))
+        self.block1 = MixedBlock(self.createConvList(modules, 3, 64, norm))
+        self.block2 = MixedBlock(self.createConvList(["CONV3", "CONV7"], 64, 64, norm))
+        self.block3 = MixedBlock(self.createConvList(["CONV3", "CONV5", "CONV7"], 64, 64, norm))
+        self.block4 = MixedBlock(self.createConvList(["CONV1", "CONV3"], 64, 64, norm))
+        self.block5 = MixedBlock(self.createConvList(["CONV1", "CONV5", "CONV7"], 64, 64, norm))
+        self.block6 = MixedBlock(self.createConvList(["CONV1", "CONV3", "CONV5"], 64, 64, norm))
         self.pool = nn.MaxPool2d(2)
         self.lastPool = nn.MaxPool2d(2)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(64*4*4, 256),
             nn.ReLU(),
-            nn.Linear(1024, num_classes)
+            nn.Linear(256, num_classes)
         )
 
     def createConvList(self, modules:list, in_channels:int, out_channels:int, norm:bool):
@@ -42,7 +48,7 @@ class SuperCIFARNet(nn.Module):
         x = self.block5(x)
         x = self.block6(x)
         x = self.lastPool(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class OriNet(nn.Module):
