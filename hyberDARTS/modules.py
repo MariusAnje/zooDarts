@@ -64,6 +64,8 @@ class MixedHW(nn.Module):
         self.mix = nn.Parameter(torch.ones(num)).requires_grad_()
         self.latency = {}
         self.HW = np.random.randn(num)
+        self.HW = self.HW - self.HW.min()
+        self.HW = self.HW/self.HW.max()
     
     def init_latency(self, name, module, input_size):
         latencyItem = np.zeros(len(self.mix))
@@ -79,7 +81,7 @@ class MixedHW(nn.Module):
             p = self.sm(self.mix)
             output = p[0] * self.latency[name][0]
             for i in range(1, len(self.mix)):
-                output += p[i] * self.latency[name][0]
+                output += p[i] * self.latency[name][i]
             return output
         else:
             i = self.mix.argmax()
