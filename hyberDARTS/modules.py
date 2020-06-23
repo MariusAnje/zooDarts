@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 import copy
+import numpy as np
 
 
 def n_para(module:nn.Module, input_size:torch.Size):
@@ -45,15 +46,44 @@ class LayerBlock(nn.Module):
     def init_latency(self):
         self.latency = self.latency_offer(self.op, self.input_size)
     
-    def get_latency(self):
-        if self.latency is None:
-            self.init_latency()
-        return self.latency
+    def get_latency(self, HW, name):
+        # if self.latency is None:
+        #     self.init_latency()
+        return HW.get_latency(name, self.op, self.input_size)
     
     def forward(self, x):
         if self.input_size is None:
             self.input_size = x.size()
         return self.norm(self.act(self.op(x)))
+
+class MixedHW(nn.Module):
+    def __init__(self, num):
+        super(MixedHW, self).__init__()
+        self.sm = nn.Softmax(dim=-1)
+        self.is_super = True
+        self.mix = nn.Parameter(torch.ones(num)).requires_grad_()
+        self.latency = {}
+        self.HW = np.random.randn(num)
+    
+    def init_latency(self, name, module, input_size):
+        latencyItem = np.zeros(len(self.mix))
+        for i in range(len(self.mix)):
+            latencyItem[i] = self.HW[i] * n_para(module, input_size)
+        self.latency[name] = latencyItem
+    
+    def get_latency(self, name, module, input_size):
+        if not (name in self.latency.keys()):
+            self.init_latency(name, module, input_size)
+
+        if self.is_super:
+            p = self.sm(self.mix)
+            output = p[0] * self.latency[name][0]
+            for i in range(1, len(self.mix)):
+                output += p[i] * self.latency[name][0]
+            return output
+        else:
+            i = self.mix.argmax()
+            return self.latency[name][i]
 
 class MixedBlock(nn.Module):
     def __init__(self, modules:list):
@@ -80,22 +110,23 @@ class MixedBlock(nn.Module):
             i = self.mix.argmax()
             return self.moduleList[i](x)
     
-    def get_latency(self):
+    def get_latency(self, HW, name):
         if self.is_super:
             p = self.sm(self.mix)
-            output = p[0] * self.moduleList[0].get_latency()
+            output = p[0] * self.moduleList[0].get_latency(HW, name = name + ".moduleList." + str(0))
             for i in range(1, len(self.moduleList)):
-                output += p[i] * self.moduleList[i].get_latency()
+                output += p[i] * self.moduleList[i].get_latency(HW, name = name + ".moduleList." + str(i))
             return output
         else:
             i = self.mix.argmax()
-            return self.moduleList[i].get_latency()
+            return self.moduleList[i].get_latency(HW, name = name + ".moduleList." + str(i))
 
 class SuperNet(nn.Module):
     def __init__(self):
         super(SuperNet, self).__init__()
         self.model = None
         self.is_super = True
+        self.HW = MixedHW(5)
     
     def get_model(self, model):
         self.model = model
@@ -108,6 +139,7 @@ class SuperNet(nn.Module):
         for name, para in self.model.named_parameters():
             if name.find(".mix") != -1:
                 arch_params.append(para)
+        arch_params.append(self.HW.mix)
         return arch_params
     
     def get_module_choice(self):
@@ -131,13 +163,13 @@ class SuperNet(nn.Module):
                 module.is_super = is_super
     
     def get_arch_loss(self, criterion, arch_outputs, arch_labels):
-        return criterion(arch_outputs, arch_labels) + self.get_latency() * -1#* 1e-8
+        return criterion(arch_outputs, arch_labels) + self.get_latency() * 1e-8
     
     def get_latency(self):
         latency = 0.0
-        for module in self.model.modules():
+        for name, module in self.model.named_children():
             if isinstance(module, MixedBlock):
-                latency += module.get_latency()
+                latency += module.get_latency(self.HW, name)
         return latency
     
     def get_unrolled_model_grad(self, plus:bool, net_grads_f, arch_inputs, arch_labels, criterion, eps):
@@ -183,8 +215,13 @@ class SuperNet(nn.Module):
         arch_optimizer.zero_grad()
         arch_grads_s_n = self.get_unrolled_model_grad(False, net_grads_f, arch_inputs, arch_labels, criterion, eps)
         arch_optimizer.zero_grad()
+        faster_break = len(self.get_arch_params())
         for i, param in enumerate(self.get_arch_params()):
-            param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
+            if i == faster_break - 1:
+                param.grad.data = arch_grads_f[i]
+            else:
+                param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
+            
 
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
