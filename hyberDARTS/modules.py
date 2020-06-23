@@ -7,6 +7,13 @@ import torch.optim as optim
 from tqdm import tqdm
 import copy
 
+
+def n_para(module:nn.Module, input_size:torch.Size):
+    ic = module.in_channels
+    oc = module.out_channels
+    ks = module.kernel_size
+    return ic * oc * ks[0] * ks[1] * input_size[-1] * input_size[-2]
+
 class LayerBlock(nn.Module):
     """
     A block for convolution layers with activation (ReLU) and normalization
@@ -31,8 +38,21 @@ class LayerBlock(nn.Module):
         else:
             self.norm = nn.Identity()
         self.drop = nn.Dropout(p = 0.3)
+        self.latency = None
+        self.input_size = None
+        self.latency_offer = n_para
         
+    def init_latency(self):
+        self.latency = self.latency_offer(self.op, self.input_size)
+    
+    def get_latency(self):
+        if self.latency is None:
+            self.init_latency()
+        return self.latency
+    
     def forward(self, x):
+        if self.input_size is None:
+            self.input_size = x.size()
         return self.norm(self.act(self.op(x)))
 
 class MixedBlock(nn.Module):
@@ -59,6 +79,17 @@ class MixedBlock(nn.Module):
         else:
             i = self.mix.argmax()
             return self.moduleList[i](x)
+    
+    def get_latency(self):
+        if self.is_super:
+            p = self.sm(self.mix)
+            output = p[0] * self.moduleList[0].get_latency()
+            for i in range(1, len(self.moduleList)):
+                output += p[i] * self.moduleList[i].get_latency()
+            return output
+        else:
+            i = self.mix.argmax()
+            return self.moduleList[i].get_latency()
 
 class SuperNet(nn.Module):
     def __init__(self):
@@ -99,6 +130,16 @@ class SuperNet(nn.Module):
             if isinstance(module, MixedBlock):
                 module.is_super = is_super
     
+    def get_arch_loss(self, criterion, arch_outputs, arch_labels):
+        return criterion(arch_outputs, arch_labels) + self.get_latency() * 1e-10
+    
+    def get_latency(self):
+        latency = 0.0
+        for module in self.model.modules():
+            if isinstance(module, MixedBlock):
+                latency += module.get_latency()
+        return latency
+    
     def get_unrolled_model_grad(self, plus:bool, net_grads_f, arch_inputs, arch_labels, criterion, eps):
         unrolled_model = copy.deepcopy(self.model)
         if plus:
@@ -114,7 +155,7 @@ class SuperNet(nn.Module):
                     pass
                 i += 1
         arch_outputs = unrolled_model(arch_inputs)
-        arch_loss = criterion(arch_outputs, arch_labels)
+        arch_loss = self.get_arch_loss(criterion, arch_outputs, arch_labels)
         arch_loss.backward()
         arch_grads_s = []
         for name, param in unrolled_model.named_parameters():
@@ -131,16 +172,17 @@ class SuperNet(nn.Module):
         arch_inputs, arch_labels = arch_data
         arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
         arch_outputs = self.model(arch_inputs)
-        arch_loss = criterion(arch_outputs, arch_labels)
+        arch_loss = self.get_arch_loss(criterion, arch_outputs, arch_labels)
         arch_loss.backward()
         arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
         net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
-        net_optimizer.zero_grad()
+        # net_optimizer.zero_grad()
         arch_optimizer.zero_grad()
         arch_grads_s_p = self.get_unrolled_model_grad(True, net_grads_f, arch_inputs, arch_labels, criterion, eps)
-        net_optimizer.zero_grad()
+        # net_optimizer.zero_grad()
         arch_optimizer.zero_grad()
         arch_grads_s_n = self.get_unrolled_model_grad(False, net_grads_f, arch_inputs, arch_labels, criterion, eps)
+        arch_optimizer.zero_grad()
         for i, param in enumerate(self.get_arch_params()):
             param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
 
