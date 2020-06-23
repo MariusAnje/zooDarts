@@ -131,7 +131,7 @@ class SuperNet(nn.Module):
                 module.is_super = is_super
     
     def get_arch_loss(self, criterion, arch_outputs, arch_labels):
-        return criterion(arch_outputs, arch_labels) + self.get_latency() * 1e-10
+        return criterion(arch_outputs, arch_labels) + self.get_latency() * -1#* 1e-8
     
     def get_latency(self):
         latency = 0.0
