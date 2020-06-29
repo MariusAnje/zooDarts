@@ -334,6 +334,77 @@ class SuperNet(nn.Module):
                 self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
                 arch_optimizer.step()
     
+    def train_debug(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
+        """
+            trains the super net
+        """
+        self.model.train()
+
+        loss_list = []
+        avg_size = 100
+        running_loss = 0.0
+        i = 0
+        # arch_loader = iter(arch_loader)
+        c_gradList = []
+        l_gradList = []
+        with tqdm(net_loader) as run_loader:
+            for inputs, labels in run_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                net_optimizer.zero_grad()
+                arch_optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = criterion(outputs, labels)
+                loss_list.append(loss.data.clone())
+                running_loss += loss
+                loss.backward()
+                net_optimizer.step()
+                i += 1
+                run_loader.set_description(f"{running_loss/i:.4f}")
+
+                c_grad, l_grad = self.unroll_debug(arch_loader, arch_optimizer, net_optimizer, criterion, device)
+                c_gradList.append(c_grad)
+                l_gradList.append(l_grad)
+                arch_optimizer.step()
+        return c_gradList, l_gradList
+    
+    def unroll_debug(self, arch_loader, arch_optimizer, net_optimizer, criterion, device):
+        """
+            get second-order derivatives (gradients) for the model
+            grad2 = grad(loss(model(w^+, inputs), labels)) - grad(loss(model(w^-, inputs), labels))
+            grad_step = grad1 - grad2/(2 * eps)
+            returns a set of gradients
+        """
+        arch_data = next(iter(arch_loader))
+        eps = 1e-5
+        net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_inputs, arch_labels = arch_data
+        arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
+        arch_outputs = self.model(arch_inputs)
+        c_loss, l_loss = self.get_arch_loss_debug(criterion, arch_outputs, arch_labels)
+        c_loss.backward()
+        c_grad_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()[:-1]]
+        l_loss.backward()
+        arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
+        l_grad_f = [copy.deepcopy(arch_grads_f[i].data - c_grad_f[i].data) for i in range(len(self.get_arch_params())-1)]
+
+        
+        net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
+        # net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_grads_s_p = self.get_unrolled_model_grad(True, net_grads_f, arch_inputs, arch_labels, criterion, eps)
+        # net_optimizer.zero_grad()
+        arch_optimizer.zero_grad()
+        arch_grads_s_n = self.get_unrolled_model_grad(False, net_grads_f, arch_inputs, arch_labels, criterion, eps)
+        arch_optimizer.zero_grad()
+        faster_break = len(self.get_arch_params())
+        for i, param in enumerate(self.get_arch_params()):
+            if i == faster_break - 1:
+                param.grad.data = arch_grads_f[i]
+            else:
+                param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
+        return c_grad_f, l_grad_f
+    
     def warm(self, net_loader, net_optimizer, criterion, device):
         """
             warming up, training the super net without updating arch parameters
