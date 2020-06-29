@@ -19,6 +19,7 @@ class LayerBlock(nn.Module):
     """
     A block for convolution layers with activation (ReLU) and normalization
     supported type: CONV1, CONV3, CONV5, CONV7, ID
+    Also calculates the latency of this block (well, neglects the latency of BN and activation layers and only count conv layers)
     """
     def __init__(self, bType:str, in_channels:int, out_channels:int, norm:bool):
         super(LayerBlock, self).__init__()
@@ -39,14 +40,21 @@ class LayerBlock(nn.Module):
         else:
             self.norm = nn.Identity()
         self.drop = nn.Dropout(p = 0.3)
-        self.latency = None
         self.input_size = None
-        self.latency_offer = n_para
+        self.latency_offer = n_para # DEPRECATED
+        self.latency = None         # DEPRECATED
         
     def init_latency(self):
+        """
+            DEPRECATED
+            Initialize the latency for this block
+        """
         self.latency = self.latency_offer(self.op, self.input_size)
     
     def get_latency(self, HW, name):
+        """
+            get the latency of this block from HW registers
+        """
         # if self.latency is None:
         #     self.init_latency()
         return HW.get_latency(name, self.op, self.input_size)
@@ -57,23 +65,37 @@ class LayerBlock(nn.Module):
         return self.norm(self.act(self.op(x)))
 
 class MixedHW(nn.Module):
+    """
+        A hardware mixed block where hosting different hardware designs
+    """
     def __init__(self, num):
         super(MixedHW, self).__init__()
         self.sm = nn.Softmax(dim=-1)
         self.is_super = True
         self.mix = nn.Parameter(torch.ones(num)).requires_grad_()
         self.latency = {}
+        """
+            TODO: replace this random HW by functions
+        """
         self.HW = np.random.randn(num)
         self.HW = self.HW - self.HW.min()
         self.HW = self.HW/self.HW.max()
     
     def init_latency(self, name, module, input_size):
+        """
+            initialize the latency of one software module using different hardware designs
+            TODO: replace random HW by functions
+        """
         latencyItem = np.zeros(len(self.mix))
         for i in range(len(self.mix)):
-            latencyItem[i] = self.HW[i] * n_para(module, input_size)
+            latencyItem[i] = self.HW[i] * n_para(module, input_size) # TODO: replace random HW by functions
         self.latency[name] = latencyItem
     
     def get_latency(self, name, module, input_size):
+        """
+            Returns the latency of one module
+            it is the weighted sum of different hardware designs
+        """
         if not (name in self.latency.keys()):
             self.init_latency(name, module, input_size)
 
@@ -131,12 +153,22 @@ class SuperNet(nn.Module):
         self.HW = MixedHW(5)
     
     def get_model(self, model):
+        """
+            Initiate superNet model
+        """
         self.model = model
     
     def load_state_dict(self, state_dict):
+        """
+            Load pretrained parameters
+        """
         self.model.load_state_dict(state_dict)
     
     def get_arch_params(self):
+        """
+            get probabilities (logits) for architecture
+            returns a list of tensors
+        """
         arch_params = []
         for name, para in self.model.named_parameters():
             if name.find(".mix") != -1:
@@ -145,6 +177,10 @@ class SuperNet(nn.Module):
         return arch_params
     
     def get_module_choice(self):
+        """
+            get the finally chosen module for each mixed block
+            returns a list of integers 
+        """
         module_choice = []
         for name, module in self.model.named_modules():
             if isinstance(module, MixedBlock):
@@ -152,6 +188,10 @@ class SuperNet(nn.Module):
         return module_choice
     
     def get_net_params(self):
+        """
+            get NN parameters of the model
+            returns a list of tensors
+        """
         net_params = []
         for name, para in self.model.named_parameters():
             if name.find(".mix") == -1:
@@ -159,15 +199,36 @@ class SuperNet(nn.Module):
         return net_params
 
     def modify_super(self, is_super):
+        """
+            modify if self.model inference as a super net or use chosen modules
+            True: acts as a super net
+            False: use the module with highest probability
+        """
         self.is_super = is_super
         for module in self.model.modules():
-            if isinstance(module, MixedBlock):
+            if isinstance(module, MixedBlock) or isinstance(module, MixedHW):
                 module.is_super = is_super
     
     def get_arch_loss(self, criterion, arch_outputs, arch_labels):
+        """
+            get the loss used to update architecture parameters
+            returns a scaler
+        """
         return criterion(arch_outputs, arch_labels) + self.get_latency() * 1e-8
     
+    def get_arch_loss_debug(self, criterion, arch_outputs, arch_labels):
+        """
+            DEBUG use
+            get the loss used to update architecture parameters
+            returns a scaler
+        """
+        return criterion(arch_outputs, arch_labels), self.get_latency() * 1e-8
+    
     def get_latency(self):
+        """
+            get weighted latency for each component
+            returns a scaler
+        """
         latency = 0.0
         for name, module in self.model.named_children():
             if isinstance(module, MixedBlock):
@@ -175,6 +236,11 @@ class SuperNet(nn.Module):
         return latency
     
     def get_unrolled_model_grad(self, plus:bool, net_grads_f, arch_inputs, arch_labels, criterion, eps):
+        """
+            a tool to get second-order derivatives (gradients) for the model
+            grad_new = grad(criterion(model(weight + eps * singer * (grad_old), arch_inputs), arch_labels))
+            returns a set of gradients
+        """
         unrolled_model = copy.deepcopy(self.model)
         if plus:
             signer = 1
@@ -199,6 +265,12 @@ class SuperNet(nn.Module):
 
     
     def unroll(self, arch_loader, arch_optimizer, net_optimizer, criterion, device):
+        """
+            get second-order derivatives (gradients) for the model
+            grad2 = grad(loss(model(w^+, inputs), labels)) - grad(loss(model(w^-, inputs), labels))
+            grad_step = grad1 - grad2/(2 * eps)
+            returns a set of gradients
+        """
         arch_data = next(iter(arch_loader))
         eps = 1e-5
         net_optimizer.zero_grad()
@@ -227,6 +299,9 @@ class SuperNet(nn.Module):
 
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
+        """
+            trains the super net
+        """
         self.model.train()
 
         loss_list = []
@@ -260,6 +335,10 @@ class SuperNet(nn.Module):
                 arch_optimizer.step()
     
     def warm(self, net_loader, net_optimizer, criterion, device):
+        """
+            warming up, training the super net without updating arch parameters
+            Note that initial probabilities for each module are the same
+        """
         self.model.train()
 
         loss_list = []
@@ -281,6 +360,9 @@ class SuperNet(nn.Module):
                 run_loader.set_description(f"{running_loss/i:.4f}")
     
     def test(self, loader, device):
+        """
+            inference and return the accuracy
+        """
         correct = 0
         total = 0
         ct = 0

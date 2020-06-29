@@ -24,6 +24,7 @@ if __name__ == "__main__":
     parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
     args = parser.parse_args()
 
+    # Initial loggings, show DEBUG level on screen and write INFO level in file
     fileHandler = logging.FileHandler(args.log_filename, mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
@@ -38,14 +39,21 @@ if __name__ == "__main__":
     logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
     logging.info(args.ex_info)
     
+    # Find dataset. I use both windows (desktop) and Linux (server)
+    # "nt" for dataset stored on windows machine and else for dataset stored on Linux
     if os.name == "nt":
         dataPath = "~/testCode/data"
     else:
         dataPath = "/dataset/CIFAR10"
+    
+    # TODO: get some data augmentation?
     transform = transforms.Compose(
         [transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform)
+    # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
+    # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
+    # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
     logging.debug("Caching data")
     trainset_in_memory = []
     for data in trainset:
@@ -60,21 +68,26 @@ if __name__ == "__main__":
     superModel.get_model(SuperCIFARNet())
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
+    # Training optimizers
     archOptimizer = optim.Adam(archParams,lr = 0.1)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
+    # GPU or CPU
     device = torch.device(args.device)
     superModel.to(device)
 
+    # Warm up. Well, DK if warm up is needed
     for i in range(0):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")
 
     for i in range(args.train_epochs):
+        # Train the super net
         superModel.modify_super(True)
         superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
         superAcc = superModel.test(testloader, device)
+        # Test the chosen modules
         superModel.modify_super(False)
         acc = superModel.test(testloader, device)
         logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
