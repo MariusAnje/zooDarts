@@ -47,10 +47,16 @@ if __name__ == "__main__":
         dataPath = "/dataset/CIFAR10"
     
     # TODO: get some data augmentation?
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform)
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
     # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
     # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
     # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
@@ -58,9 +64,9 @@ if __name__ == "__main__":
     trainset_in_memory = []
     for data in trainset:
         trainset_in_memory.append(data)
-    trainLoader = torch.utils.data.DataLoader(trainset_in_memory, batch_size=args.batchSize, shuffle=True)
+    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     archLoader  = torch.utils.data.DataLoader(trainset_in_memory, batch_size=args.batchSize, shuffle=True)
-    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
 
     logging.debug("Creating model")
@@ -77,6 +83,8 @@ if __name__ == "__main__":
     superModel.to(device)
 
     # Warm up. Well, DK if warm up is needed
+    # For latency, I would think of two methods. Warming only weights is one
+    # Warming also arch without latency is even more interesting
     for i in range(5):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
