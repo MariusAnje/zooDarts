@@ -77,7 +77,7 @@ if __name__ == "__main__":
     superModel.to(device)
 
     # Warm up. Well, DK if warm up is needed
-    for i in range(0):
+    for i in range(5):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")
