@@ -92,12 +92,16 @@ if __name__ == "__main__":
 
     c_gradT = []
     l_gradT = []
+    debug = False
     for i in range(args.train_epochs):
         # Train the super net
         superModel.modify_super(True)
-        c_gradList, l_gradList = superModel.train_debug(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
-        c_gradT.append(c_gradList)
-        l_gradT.append(l_gradList)
+        if debug:
+            c_gradList, l_gradList = superModel.train_debug(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+            c_gradT.append(c_gradList)
+            l_gradT.append(l_gradList)
+        else:
+            superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
         superAcc = superModel.test(testloader, device)
         # Test the chosen modules
         superModel.modify_super(False)
@@ -107,5 +111,6 @@ if __name__ == "__main__":
         logging.debug(superModel.get_arch_params())
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     
-    torch.save([c_gradT, l_gradT], "gradients.pt")
+    if debug:
+        torch.save([c_gradT, l_gradT], "gradients.pt")
 
