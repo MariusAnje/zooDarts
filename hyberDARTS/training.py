@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # Warm up. Well, DK if warm up is needed
     # For latency, I would think of two methods. Warming only weights is one
     # Warming also arch without latency is even more interesting
-    for i in range(5):
+    for i in range(0):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")
