@@ -214,7 +214,7 @@ class SuperNet(nn.Module):
             get the loss used to update architecture parameters
             returns a scaler
         """
-        return criterion(arch_outputs, arch_labels)* self.get_latency() #* 1e-8
+        return criterion(arch_outputs, arch_labels)* self.get_latency() * 1e-5
     
     def get_arch_loss_debug(self, criterion, arch_outputs, arch_labels):
         """
