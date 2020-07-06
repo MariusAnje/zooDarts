@@ -1,0 +1,6 @@
+.DS_Store
+backup/
+**/__pycache__
+.ipynb*
+data/
+debug*
