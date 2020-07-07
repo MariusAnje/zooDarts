@@ -4,6 +4,15 @@ import logging
 import os
 import time
 import torch
+import torchvision
+import numpy as np
+import torchvision.transforms as transforms
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import logging
+import os
+import tqdm
 
 import sys
 sys.path.append('./darts')
@@ -20,8 +29,12 @@ from RL.fpga.model import FPGAModel
 from RL import utility
 
 from darts import modules
+from darts.modules import SuperNet, MixedBlock
+from darts.models import SubCIFARNet
 
-exit()
+import utils
+
+
 
 # def get_args():
 parser = argparse.ArgumentParser('Parser User Input Arguments')
@@ -134,7 +147,16 @@ parser.add_argument(
     default=0,
     help="verbosity level: 0 (default), 1 and 2 with 2 being the most verbose"
     )
+
+parser.add_argument('--batchSize', action="store", type=int, default=64)
+parser.add_argument('--pretrained', action="store_true")
+parser.add_argument('--train_epochs', action="store", type = int, default = 10)
+parser.add_argument('--log_filename', action="store", type = str, default = "log")
+parser.add_argument('--device', action="store", type = str, default = "cuda:0")
+parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
 args = parser.parse_args()
+args.device = f"cuda:{args.gpu}"
+args.batchSize = args.batch_size
 
 
 if args.no_stride is True:
@@ -216,10 +238,12 @@ def nas(device, dir='experiment'):
     logger.info('=' * 50 + "Start exploring architecture space" + '=' * 50)
     logger.info('-' * len("Start exploring architecture space"))
     best_samples = BestSamples(5)
+    rollout_record = []
     for e in range(args.episodes):
         arch_id += 1
         start = time.time()
         arch_rollout, arch_paras = agent.rollout()
+        rollout_record.append(arch_rollout)
         logger.info("Sample Architecture ID: {}, Sampled actions: {}".format(
                     arch_id, arch_rollout))
         model, optimizer = child.get_model(
@@ -249,334 +273,102 @@ def nas(device, dir='experiment'):
     logger.info(f"Total elasped time: {total_time}")
     logger.info(f"Best samples: {best_samples}")
     csvfile.close()
+    darts(rollout_record)
+    
 
+def darts(rollout_record):
+    fileHandler = logging.FileHandler(args.log_filename, mode = "a+")
+    fileHandler.setLevel(logging.INFO)
+    streamHandler = logging.StreamHandler()
+    streamHandler.setLevel(logging.DEBUG)
+    logging.basicConfig(
+                        handlers=[
+                                    fileHandler,
+                                    streamHandler],
+                        level= logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s')
 
-def sync_search(device, dir='experiment'):
-    dir = os.path.join(
-        dir, f"rLut={args.rLUT}, rThroughput={args.rThroughput}")
-    if os.path.exists(dir) is False:
-        os.makedirs(dir)
-    filepath = os.path.join(dir, f"joint ({args.episodes} episodes)")
-    logger = get_logger(filepath)
-    csvfile = open(filepath+'.csv', mode='w+', newline='')
-    writer = csv.writer(csvfile)
-    logger.info(f"INFORMATION")
-    logger.info(f"mode: \t\t\t\t\t {'joint'}")
-    logger.info(f"dataset: \t\t\t\t {args.dataset}")
-    logger.info(f"number of child network layers: \t {args.layers}")
-    logger.info(f"include stride: \t\t\t {not args.no_stride}")
-    logger.info(f"include pooling: \t\t\t {not args.no_pooling}")
-    logger.info(f"skip connection: \t\t\t {args.skip}")
-    logger.info(f"required # LUTs: \t\t\t {args.rLUT}")
-    logger.info(f"required throughput: \t\t\t {args.rThroughput}")
-    logger.info(f"Assumed frequency: \t\t\t {CLOCK_FREQUENCY}")
-    logger.info(f"training epochs: \t\t\t {args.epochs}")
-    logger.info(f"data augmentation: \t\t\t {args.augment}")
-    logger.info(f"batch size: \t\t\t\t {args.batch_size}")
-    logger.info(f"controller learning rate: \t\t {args.learning_rate}")
-    logger.info(f"architecture episodes: \t\t\t {args.episodes}")
-    logger.info(f"using multi gpus: \t\t\t {args.multi_gpu}")
-    logger.info(f"architecture space: ")
-    for name, value in ARCH_SPACE.items():
-        logger.info(name + f": \t\t\t\t {value}")
-    logger.info(f"quantization space: ")
-    for name, value in QUAN_SPACE.items():
-        logger.info(name + f": \t\t\t {value}")
-    agent = Agent({**ARCH_SPACE, **QUAN_SPACE}, args.layers,
-                  lr=args.learning_rate,
-                  device=torch.device('cpu'), skip=args.skip)
-    train_data, val_data = data.get_data(
-        args.dataset, device, shuffle=True,
-        batch_size=args.batch_size, augment=args.augment)
-    input_shape, num_classes = data.get_info(args.dataset)
-    writer.writerow(["ID"] +
-                    ["Layer {}".format(i) for i in range(args.layers)] +
-                    ["Accuracy"] +
-                    ["Partition (Tn, Tm)", "Partition (#LUTs)",
-                    "Partition (#cycles)", "Total LUT", "Total Throughput"] +
-                    ["Time"])
-    child_id, total_time = 0, 0
-    logger.info('=' * 50 +
-                "Start exploring architecture & quantization space" + '=' * 50)
-    best_samples = BestSamples(5)
-    for e in range(args.episodes):
-        logger.info('-' * 130)
-        child_id += 1
-        start = time.time()
-        rollout, paras = agent.rollout()
-        logger.info("Sample Architecture ID: {}, Sampled actions: {}".format(
-                    child_id, rollout))
-        arch_paras, quan_paras = utility.split_paras(paras)
-        fpga_model = FPGAModel(rLUT=args.rLUT, rThroughput=args.rThroughput,
-                               arch_paras=arch_paras, quan_paras=quan_paras)
-        if fpga_model.validate():
-            model, optimizer = child.get_model(
-                input_shape, arch_paras, num_classes, device,
-                multi_gpu=args.multi_gpu, do_bn=False)
-            _, reward = backend.fit(
-                model, optimizer, train_data, val_data, quan_paras=quan_paras,
-                epochs=args.epochs, verbosity=args.verbosity)
+    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+    logging.info(args.ex_info)
+    
+    # Find dataset. I use both windows (desktop) and Linux (server)
+    # "nt" for dataset stored on windows machine and else for dataset stored on Linux
+    if os.name == "nt":
+        dataPath = "~/testCode/data"
+    else:
+        dataPath = "/dataset/CIFAR10"
+    
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
+    # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
+    # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
+    logging.debug("Caching data")
+    trainset_in_memory = []
+    for data in trainset:
+        trainset_in_memory.append(data)
+    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
+    archLoader  = torch.utils.data.DataLoader(trainset_in_memory, batch_size=args.batchSize, shuffle=True)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+
+    logging.debug("Creating model")
+    subspace = utils.min_subspace(rollout_record, 9)
+    superModel = SuperNet()
+    superModel.get_model(SubCIFARNet(subspace))
+    archParams = superModel.get_arch_params()
+    netParams  = superModel.get_net_params()
+    # Training optimizers
+    archOptimizer = optim.Adam(archParams,lr = 0.1)
+    netOptimizer  = optim.Adam(netParams, lr = 1e-3)
+    criterion = nn.CrossEntropyLoss()
+    # GPU or CPU
+    device = torch.device(args.device)
+    superModel.to(device)
+
+    # Warm up. Well, DK if warm up is needed
+    # For latency, I would think of two methods. Warming only weights is one
+    # Warming also arch without latency is even more interesting
+    for i in range(5):
+        superModel.modify_super(True)
+        superModel.warm(trainLoader, netOptimizer, criterion, device)
+        logging.debug(f"           arch: {superModel.get_arch_params()}")
+
+    c_gradT = []
+    l_gradT = []
+    debug = False
+    for i in range(args.train_epochs):
+        # Train the super net
+        superModel.modify_super(True)
+        if debug:
+            c_gradList, l_gradList = superModel.train_debug(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+            c_gradT.append(c_gradList)
+            l_gradT.append(l_gradList)
         else:
-            reward = 0
-        agent.store_rollout(rollout, reward)
-        end = time.time()
-        ep_time = end - start
-        total_time += ep_time
-        best_samples.register(child_id, rollout, reward)
-        writer.writerow(
-            [child_id] +
-            [str(paras[i]) for i in range(args.layers)] +
-            [reward] + list(fpga_model.get_info()) + [ep_time]
-            )
-        logger.info(f"Reward: {reward}, " +
-                    f"Elasped time: {ep_time}, " +
-                    f"Average time: {total_time/(e+1)}")
-        logger.info(f"Best Reward: {best_samples.reward_list[0]}, " +
-                    f"ID: {best_samples.id_list[0]}, " +
-                    f"Rollout: {best_samples.rollout_list[0]}")
-    logger.info(
-        '=' * 50 +
-        "Architecture & quantization sapce exploration finished" +
-        '=' * 50)
-    logger.info(f"Total elasped time: {total_time}")
-    logger.info(f"Best samples: {best_samples}")
-    csvfile.close()
-
-
-def nested_search(device, dir='experiment'):
-    dir = os.path.join(
-        dir, f"rLut={args.rLUT}, rThroughput={args.rThroughput}")
-    if os.path.exists(dir) is False:
-        os.makedirs(dir)
-    filepath = os.path.join(dir, f"nested ({args.episodes} episodes)")
-    logger = get_logger(filepath)
-    csvfile = open(filepath+'.csv', mode='w+', newline='')
-    writer = csv.writer(csvfile)
-    logger.info(f"INFORMATION")
-    logger.info(f"mode: \t\t\t\t\t {'nested'}")
-    logger.info(f"dataset: \t\t\t\t {args.dataset}")
-    logger.info(f"number of child network layers: \t {args.layers}")
-    logger.info(f"include stride: \t\t\t {not args.no_stride}")
-    logger.info(f"include pooling: \t\t\t {not args.no_pooling}")
-    logger.info(f"skip connection: \t\t\t {args.skip}")
-    logger.info(f"required # LUTs: \t\t\t {args.rLUT}")
-    logger.info(f"required throughput: \t\t\t {args.rThroughput}")
-    logger.info(f"Assumed frequency: \t\t\t {CLOCK_FREQUENCY}")
-    logger.info(f"training epochs: \t\t\t {args.epochs}")
-    logger.info(f"data augmentation: \t\t\t {args.augment}")
-    logger.info(f"batch size: \t\t\t\t {args.batch_size}")
-    logger.info(f"controller learning rate: \t\t {args.learning_rate}")
-    logger.info(f"architecture episodes: \t\t\t {args.episodes1}")
-    logger.info(f"quantization episodes: \t\t\t {args.episodes2}")
-    logger.info(f"using multi gpus: \t\t\t {args.multi_gpu}")
-    logger.info(f"architecture space: ")
-    for name, value in ARCH_SPACE.items():
-        logger.info(name + f": \t\t\t\t {value}")
-    logger.info(f"quantization space: ")
-    for name, value in QUAN_SPACE.items():
-        logger.info(name + f": \t\t\t {value}")
-    train_data, val_data = data.get_data(
-        args.dataset, device, shuffle=True,
-        batch_size=args.batch_size, augment=args.augment)
-    input_shape, num_classes = data.get_info(args.dataset)
-    writer.writerow(["ID"] +
-                    ["Layer {}".format(i) for i in range(args.layers)] +
-                    ["Accuracy"] +
-                    ["Partition (Tn, Tm)", "Partition (#LUTs)",
-                    "Partition (#cycles)", "Total LUT", "Total Throughput"] +
-                    ["Time"])
-    arch_agent = Agent(ARCH_SPACE, args.layers,
-                       lr=args.learning_rate,
-                       device=torch.device('cpu'), skip=args.skip)
-    arch_id, total_time = 0, 0
-    logger.info('=' * 50 +
-                "Start exploring architecture space" + '=' * 50)
-    best_arch = BestSamples(5)
-    for e1 in range(args.episodes1):
-        logger.info('-' * 130)
-        arch_id += 1
-        start = time.time()
-        arch_rollout, arch_paras = arch_agent.rollout()
-        logger.info("Sample Architecture ID: {}, Sampled arch: {}".format(arch_id, arch_rollout))
-        model, optimizer = child.get_model(
-            input_shape, arch_paras, num_classes, device,
-            multi_gpu=args.multi_gpu, do_bn=False)
-        backend.fit(
-            model, optimizer, train_data, val_data,
-            epochs=args.epochs, verbosity=args.verbosity)
-        quan_id = 0
-        best_quan_reward = -1
-        logger.info('=' * 50 +
-                "Start exploring quantization space" + '=' * 50)
-        quan_agent = Agent(QUAN_SPACE, args.layers,
-            lr=args.learning_rate,
-            device=torch.device('cpu'), skip=False)
-        for e2 in range(args.episodes2):
-            quan_id += 1
-            quan_rollout, quan_paras = quan_agent.rollout()
-            fpga_model = FPGAModel(
-                rLUT=args.rLUT, rThroughput=args.rThroughput,
-                arch_paras=arch_paras, quan_paras=quan_paras)
-            if fpga_model.validate():
-                _, quan_reward = backend.fit(
-                    model, optimizer,
-                    val_data=val_data, quan_paras=quan_paras,
-                    epochs=1, verbosity=args.verbosity)
-            else:
-                quan_reward = 0
-            logger.info("Sample Quantization ID: {}, Sampled Quantization: {}, reward: {}".format(quan_id, quan_rollout, quan_reward))
-            quan_agent.store_rollout(quan_rollout, quan_reward)
-            if quan_reward > best_quan_reward:
-                best_quan_reward = quan_reward
-                best_quan_rollout, best_quan_paras = quan_rollout, quan_paras
-        logger.info('=' * 50 +
-                "Quantization space exploration finished" + '=' * 50)
-        arch_reward = best_quan_reward
-        arch_agent.store_rollout(arch_rollout, arch_reward)
-        end = time.time()
-        ep_time = end - start
-        total_time += ep_time
-        best_arch.register(arch_id, utility.combine_rollout(arch_rollout,best_quan_rollout, args.layers), arch_reward)
-        writer.writerow(
-            [arch_id] +
-            [str(arch_paras[i]) + '\n' + str(best_quan_paras[i])
-             for i in range(args.layers)] +
-            [arch_reward] + list(fpga_model.get_info()) + [ep_time]
-            )
-        logger.info(f"Reward: {arch_reward}, " +
-                    f"Elasped time: {ep_time}, " +
-                    f"Average time: {total_time/(e1+1)}")
-        logger.info(f"Best Reward: {best_arch.reward_list[0]}, " +
-                    f"ID: {best_arch.id_list[0]}, " +
-                    f"Rollout: {best_arch.rollout_list[0]}")
-    logger.info(
-        '=' * 50 +
-        "Architecture & quantization sapce exploration finished" +
-        '=' * 50)
-    logger.info(f"Total elasped time: {total_time}")
-    logger.info(f"Best samples: {best_arch}")
-    csvfile.close()
-
-
-def quantization_search(device, dir='experiment'):
-    dir = os.path.join(
-        dir, f"rLut={args.rLUT}, rThroughput={args.rThroughput}")
-    if os.path.exists(dir) is False:
-        os.makedirs(dir)
-    filepath = os.path.join(dir, f"quantization ({args.episodes} episodes)")
-    logger = get_logger(filepath)
-    csvfile = open(filepath+'.csv', mode='w+', newline='')
-    writer = csv.writer(csvfile)
-    logger.info(f"INFORMATION")
-    logger.info(f"mode: \t\t\t\t\t {'quantization'}")
-    logger.info(f"dataset: \t\t\t\t {args.dataset}")
-    logger.info(f"number of child network layers: \t {args.layers}")
-    logger.info(f"include stride: \t\t\t {not args.no_stride}")
-    logger.info(f"include pooling: \t\t\t {not args.no_pooling}")
-    logger.info(f"skip connection: \t\t\t {args.skip}")
-    logger.info(f"required # LUTs: \t\t\t {args.rLUT}")
-    logger.info(f"required throughput: \t\t\t {args.rThroughput}")
-    logger.info(f"Assumed frequency: \t\t\t {CLOCK_FREQUENCY}")
-    logger.info(f"training epochs: \t\t\t {args.epochs}")
-    logger.info(f"data augmentation: \t\t\t {args.augment}")
-    logger.info(f"batch size: \t\t\t\t {args.batch_size}")
-    logger.info(f"controller learning rate: \t\t {args.learning_rate}")
-    logger.info(f"architecture episodes: \t\t\t {args.episodes}")
-    logger.info(f"using multi gpus: \t\t\t {args.multi_gpu}")
-    logger.info(f"architecture space: ")
-    # for name, value in ARCH_SPACE.items():
-    #     logger.info(name + f": \t\t\t\t {value}")
-    logger.info(f"quantization space: ")
-    for name, value in QUAN_SPACE.items():
-        logger.info(name + f": \t\t\t {value}")
-    agent = Agent(QUAN_SPACE, args.layers,
-                lr=args.learning_rate, device=torch.device('cpu'), skip=False)
-    train_data, val_data = data.get_data(
-        args.dataset, device, shuffle=True,
-        batch_size=args.batch_size, augment=args.augment)
-    input_shape, num_classes = data.get_info(args.dataset)
-    writer.writerow(["ID"] +
-                    ["Layer {}".format(i) for i in range(args.layers)] +
-                    ["Accuracy"] +
-                    ["Partition (Tn, Tm)", "Partition (#LUTs)",
-                    "Partition (#cycles)", "Total LUT", "Total Throughput"] +
-                    ["Time"])
-    child_id, total_time = 0, 0
-    logger.info('=' * 50 +
-                "Start exploring quantization space" + '=' * 50)
-    best_samples = BestSamples(5)
-    arch_paras = [
-        {'filter_height': 3, 'filter_width': 3,
-         'stride_height': 1, 'stride_width': 1,
-         'num_filters': 64, 'pool_size': 1},
-        {'filter_height': 7, 'filter_width': 5,
-         'stride_height': 1, 'stride_width': 1,
-         'num_filters': 48, 'pool_size': 1},
-        {'filter_height': 5, 'filter_width': 5,
-         'stride_height': 2, 'stride_width': 1,
-         'num_filters': 48, 'pool_size': 1},
-        {'filter_height': 3, 'filter_width': 5,
-         'stride_height': 1, 'stride_width': 1,
-         'num_filters': 64, 'pool_size': 1},
-        {'filter_height': 5, 'filter_width': 7,
-         'stride_height': 1, 'stride_width': 1,
-         'num_filters': 36, 'pool_size': 1},
-        {'filter_height': 3, 'filter_width': 1,
-         'stride_height': 1, 'stride_width': 2,
-         'num_filters': 64, 'pool_size': 2}]
-    model, optimizer = child.get_model(
-                input_shape, arch_paras, num_classes, device,
-                multi_gpu=args.multi_gpu, do_bn=False)
-    _, val_acc = backend.fit(
-        model, optimizer, train_data = train_data, val_data=val_data,
-        epochs=args.epochs, verbosity=args.verbosity)
-    print(val_acc)
-    for e in range(args.episodes):
-        logger.info('-' * 130)
-        child_id += 1
-        start = time.time()
-        quan_rollout, quan_paras = agent.rollout()
-        logger.info("Sample Quantization ID: {}, Sampled actions: {}".format(
-                    child_id, quan_rollout))
-        fpga_model = FPGAModel(rLUT=args.rLUT, rThroughput=args.rThroughput,
-                               arch_paras=arch_paras, quan_paras=quan_paras)
-        if fpga_model.validate():
-            _, reward = backend.fit(
-                model, optimizer,
-                val_data=val_data, quan_paras=quan_paras,
-                epochs=1, verbosity=args.verbosity)
-        else:
-            reward = 0
-        agent.store_rollout(quan_rollout, reward)
-        end = time.time()
-        ep_time = end - start
-        total_time += ep_time
-        best_samples.register(child_id, quan_rollout, reward)
-        writer.writerow(
-            [child_id] +
-            [str(quan_paras[i]) for i in range(args.layers)] +
-            [reward] + list(fpga_model.get_info()) + [ep_time]
-            )
-        logger.info(f"Reward: {reward}, " +
-                    f"Elasped time: {ep_time}, " +
-                    f"Average time: {total_time/(e+1)}")
-        logger.info(f"Best Reward: {best_samples.reward_list[0]}, " +
-                    f"ID: {best_samples.id_list[0]}, " +
-                    f"Rollout: {best_samples.rollout_list[0]}")
-    logger.info(
-        '=' * 50 +
-        "Quantization sapce exploration finished" +
-        '=' * 50)
-    logger.info(f"Total elasped time: {total_time}")
-    logger.info(f"Best samples: {best_samples}")
-    csvfile.close()
-
+            superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+        superAcc = superModel.test(testloader, device)
+        # Test the chosen modules
+        superModel.modify_super(False)
+        acc = superModel.test(testloader, device)
+        logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
+        logging.info(f"           arch: {superModel.get_module_choice()}")
+        logging.debug(superModel.get_arch_params())
+        torch.save(superModel.model.state_dict(), "checkpoint.pt")
+    
 
 SCRIPT = {
     'nas': nas,
-    'joint': sync_search,
-    'nested': nested_search,
-    'quantization': quantization_search
+    # 'joint': sync_search,
+    # 'nested': nested_search,
+    # 'quantization': quantization_search
 }
 
 if __name__ == '__main__':
@@ -584,7 +376,3 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     main()
-
-
-
-a = modules.MixedHW(5)

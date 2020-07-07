@@ -51,6 +51,46 @@ class SuperCIFARNet(nn.Module):
         x = self.classifier(x.view(-1, 512*4*4))
         return x
 
+class SubCIFARNet(nn.Module):
+    def __init__(self, subspace, num_classes = 10):
+        super(SubCIFARNet, self).__init__()
+        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        # modules = ["CONV1","CONV3", "CONV5"]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        in_channels = 3
+
+        norm = True
+        moduleList = []
+        for i in range(6):
+            submodules = self.parseSubSpace(modules, subspace[i])
+            moduleList.append(MixedBlock(self.createConvList(submodules, in_channels, out_channels[i], norm)))
+            in_channels = out_channels[i]
+            if i in [1,3,5]:
+                moduleList.append(nn.MaxPool2d(2))
+        self.feature = nn.Sequential(*moduleList)
+        self.classifier = nn.Sequential(
+            nn.Linear(512*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, num_classes)
+        )
+
+    def createConvList(self, modules:list, in_channels:int, out_channels:int, norm:bool):
+        convList = []
+        for bType in modules:
+            convList.append(LayerBlock(bType, in_channels, out_channels, norm))
+        return convList
+    
+    def parseSubSpace(self, modules, space):
+        subspace = []
+        for item in space:
+            subspace.append(modules[item])
+        return subspace
+
+    def forward(self, x):
+        x = self.feature(x)
+        x = self.classifier(x.view(-1, 512*4*4))
+        return x
+
 class OriNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(OriNet, self).__init__()
@@ -88,3 +128,10 @@ class OriNet(nn.Module):
         x = self.feature(x)
         x = self.classifier(x.view(-1, 512*4*4))
         return x
+
+if __name__ == "__main__":
+    subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
+    model = SubCIFARNet(subspace)
+    x = torch.randn(16,3,32,32)
+    y = model(x).sum()
+    y.backward()

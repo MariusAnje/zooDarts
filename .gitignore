@@ -8,3 +8,11 @@
 *log*
 *.out
 hyberDARTS/debug.ipynb
+.DS_Store
+backup/
+**/__pycache__
+.ipynb*
+data/
+debug*
+experiment*
+rollout_record

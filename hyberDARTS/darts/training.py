@@ -46,7 +46,6 @@ if __name__ == "__main__":
     else:
         dataPath = "/dataset/CIFAR10"
     
-    # TODO: get some data augmentation?
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),

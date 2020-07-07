@@ -32,6 +32,11 @@ def get_mnist(shuffle=True, batch_size=64, augment=False):
 
 
 def get_cifar10(shuffle=True, batch_size=64, augment=False):
+    import os
+    if os.name == "nt":
+        dataPath = "~/testCode/data"
+    else:
+        dataPath = "/dataset/CIFAR10"
     normalize = Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
     # normalize = Normalize(
     #     (0.47359734773635864, 0.47359734773635864, 0.47359734773635864),
@@ -55,7 +60,7 @@ def get_cifar10(shuffle=True, batch_size=64, augment=False):
         ])
     trainloader = DataLoader(
         datasets.CIFAR10(
-            root='/dataset/CIFAR10',
+            root=dataPath,
             train=True,
             download=True,
             transform=train_transform
@@ -67,7 +72,7 @@ def get_cifar10(shuffle=True, batch_size=64, augment=False):
     )
     valloader = DataLoader(
         datasets.CIFAR10(
-            root='/dataset/CIFAR10',
+            root=dataPath,
             train=False,
             download=True,
             transform=val_transform
