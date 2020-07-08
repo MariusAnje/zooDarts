@@ -4,10 +4,14 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from tqdm import tqdm
+# from tqdm import tqdm
 import copy
+import sys
 import numpy as np
 
+if not (tqdm in sys.modules):
+    def tqdm(x):
+        return x
 
 def n_para(module:nn.Module, input_size:torch.Size):
     ic = module.in_channels
@@ -322,7 +326,8 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                run_loader.set_description(f"{running_loss/i:.4f}")
+                if tqdm in sys.modules:
+                    run_loader.set_description(f"{running_loss/i:.4f}")
                 
                 # arch_data = next(iter(arch_loader))
                 # net_optimizer.zero_grad()
@@ -360,7 +365,8 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                run_loader.set_description(f"{running_loss/i:.4f}")
+                if tqdm in sys.modules:
+                    run_loader.set_description(f"{running_loss/i:.4f}")
 
                 c_grad, l_grad = self.unroll_debug(arch_loader, arch_optimizer, net_optimizer, criterion, device)
                 c_gradList.append(c_grad)
@@ -429,7 +435,8 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                run_loader.set_description(f"{running_loss/i:.4f}")
+                if tqdm in sys.modules:
+                    run_loader.set_description(f"{running_loss/i:.4f}")
     
     def test(self, loader, device):
         """
