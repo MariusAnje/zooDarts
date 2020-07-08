@@ -35,6 +35,8 @@ def get_cifar10(shuffle=True, batch_size=64, augment=False):
     import os
     if os.name == "nt":
         dataPath = "~/testCode/data"
+    elif os.path.expanduser("~")[-5:] == "zyan2":
+        dataPath = "~/Private/data/CIFAR10"
     else:
         dataPath = "/dataset/CIFAR10"
     normalize = Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))

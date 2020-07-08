@@ -43,6 +43,8 @@ if __name__ == "__main__":
     # "nt" for dataset stored on windows machine and else for dataset stored on Linux
     if os.name == "nt":
         dataPath = "~/testCode/data"
+    elif os.path.expanduser("~")[-5:] == "zyan2":
+        dataPath = "~/Private/data/CIFAR10"
     else:
         dataPath = "/dataset/CIFAR10"
     
