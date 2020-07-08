@@ -262,15 +262,15 @@ def nas(device, dir='experiment'):
                         [arch_reward] +
                         [ep_time])
         logger.info(f"Architecture Reward: {arch_reward}, " +
-                    f"Elasped time: {ep_time}, " +
+                    f"Elapsed time: {ep_time}, " +
                     f"Average time: {total_time/(e+1)}")
         logger.info(f"Best Reward: {best_samples.reward_list[0]}, " +
                     f"ID: {best_samples.id_list[0]}, " +
                     f"Rollout: {best_samples.rollout_list[0]}")
         logger.info('-' * len("Start exploring architecture space"))
     logger.info(
-        '=' * 50 + "Architecture sapce exploration finished" + '=' * 50)
-    logger.info(f"Total elasped time: {total_time}")
+        '=' * 50 + "Architecture space exploration finished" + '=' * 50)
+    logger.info(f"Total elapsed time: {total_time}")
     logger.info(f"Best samples: {best_samples}")
     csvfile.close()
     darts(rollout_record)
