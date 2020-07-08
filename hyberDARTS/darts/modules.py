@@ -283,9 +283,14 @@ class SuperNet(nn.Module):
         arch_inputs, arch_labels = arch_data
         arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
         arch_outputs = self.model(arch_inputs)
-        arch_loss = self.get_arch_loss(criterion, arch_outputs, arch_labels)
-        arch_loss.backward()
+        c_loss, l_loss = self.get_arch_loss_debug(criterion, arch_outputs, arch_labels)
+        c_loss.backward()
+        c_grad_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()[:-1]]
+        l_loss.backward()
         arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
+        l_grad_f = [copy.deepcopy(arch_grads_f[i].data - c_grad_f[i].data) for i in range(len(self.get_arch_params())-1)]
+
+        
         net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
         # net_optimizer.zero_grad()
         arch_optimizer.zero_grad()
@@ -300,7 +305,6 @@ class SuperNet(nn.Module):
                 param.grad.data = arch_grads_f[i]
             else:
                 param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
-            
 
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
