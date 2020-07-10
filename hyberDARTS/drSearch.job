@@ -1,0 +1,14 @@
+#!/bin/csh
+
+#$ -M zyan2@nd.edu
+#$ -m abe
+#$ -r y
+#$ -q gpu
+#$ -N RLDR
+#$ -pe smp 4
+#$ -l gpu=1
+
+module load pytorch
+
+python -u main.py nas -ns -e 30 -ep 80 --train_epochs 60
+# python -u main.py nas -ns -e 1 -ep 10 --train_epochs 1

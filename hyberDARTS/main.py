@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import logging
 import os
-import tqdm
+# import tqdm
 
 import sys
 sys.path.append('./darts')
@@ -151,7 +151,7 @@ parser.add_argument(
 parser.add_argument('--batchSize', action="store", type=int, default=64)
 parser.add_argument('--pretrained', action="store_true")
 parser.add_argument('--train_epochs', action="store", type = int, default = 10)
-parser.add_argument('--log_filename', action="store", type = str, default = "log")
+parser.add_argument('--log_filename', action="store", type = str, default = "./experiment/log")
 parser.add_argument('--device', action="store", type = str, default = "cuda:0")
 parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
 args = parser.parse_args()
@@ -273,12 +273,15 @@ def nas(device, dir='experiment'):
     logger.info(f"Total elapsed time: {total_time}")
     logger.info(f"Best samples: {best_samples}")
     csvfile.close()
-    torch.save(rollout_record, "rollout_record")
+    torch.save(rollout_record, os.path.join("./experiment","rollout_record" + time.strftime("%m%d_%H%M_%S",time.localtime())))
+
+
+    # rollout_record = torch.load("rollout_record")
     darts(rollout_record)
     
 
 def darts(rollout_record):
-    fileHandler = logging.FileHandler(args.log_filename, mode = "a+")
+    fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
     streamHandler.setLevel(logging.DEBUG)

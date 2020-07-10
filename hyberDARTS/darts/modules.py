@@ -9,9 +9,22 @@ import copy
 import sys
 import numpy as np
 
-if not (tqdm in sys.modules):
-    def tqdm(x):
-        return x
+class tqdm():
+    def __init__(self, x):
+        self.x = x
+        self.happyInterestingFlag = True
+
+    def __enter__(self):
+        return self
+    
+    def __exit__(self ,type, value, traceback):
+        pass
+
+    def __iter__(self):
+        return iter(self.x)
+
+    def __next__(self):
+        return next(self.x)
 
 def n_para(module:nn.Module, input_size:torch.Size):
     ic = module.in_channels
@@ -186,9 +199,12 @@ class SuperNet(nn.Module):
             returns a list of integers 
         """
         module_choice = []
-        for name, module in self.model.named_modules():
-            if isinstance(module, MixedBlock):
-                module_choice.append((name, module.mix.argmax().item()))
+        # for name, module in self.model.named_modules():
+        #     if isinstance(module, MixedBlock):
+        #         module_choice.append((name, module.mix.argmax().item()))
+        arch_params = self.get_arch_params()
+        for item in arch_params:
+            module_choice.append(item.argmax().item())
         return module_choice
     
     def get_net_params(self):
@@ -283,15 +299,14 @@ class SuperNet(nn.Module):
         arch_inputs, arch_labels = arch_data
         arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
         arch_outputs = self.model(arch_inputs)
-        c_loss, l_loss = self.get_arch_loss_debug(criterion, arch_outputs, arch_labels)
-        c_loss.backward()
-        c_grad_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()[:-1]]
-        l_loss.backward()
-        arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
-        l_grad_f = [copy.deepcopy(arch_grads_f[i].data - c_grad_f[i].data) for i in range(len(self.get_arch_params())-1)]
+        arch_loss = self.get_arch_loss(criterion, arch_outputs, arch_labels)
+        arch_loss.backward()
+        # with hardware
+        # arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
 
-        
-        net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
+        # without hardware
+        arch_grads_f = [copy.deepcopy(gf.grad) for gf in self.get_arch_params()]
+        net_grads_f  = [copy.deepcopy(gf.grad) for gf in self.get_net_params()]
         # net_optimizer.zero_grad()
         arch_optimizer.zero_grad()
         arch_grads_s_p = self.get_unrolled_model_grad(True, net_grads_f, arch_inputs, arch_labels, criterion, eps)
@@ -302,7 +317,10 @@ class SuperNet(nn.Module):
         faster_break = len(self.get_arch_params())
         for i, param in enumerate(self.get_arch_params()):
             if i == faster_break - 1:
-                param.grad.data = arch_grads_f[i]
+                try:
+                    param.grad.data = arch_grads_f[i]
+                except:
+                    param.grad = arch_grads_f[i]
             else:
                 param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
 
@@ -330,7 +348,9 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                if tqdm in sys.modules:
+                try:
+                    run_loader.happyInterestingFlag
+                except:
                     run_loader.set_description(f"{running_loss/i:.4f}")
                 
                 # arch_data = next(iter(arch_loader))
@@ -369,7 +389,9 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                if tqdm in sys.modules:
+                try:
+                    run_loader.happyInterestingFlag
+                except:
                     run_loader.set_description(f"{running_loss/i:.4f}")
 
                 c_grad, l_grad = self.unroll_debug(arch_loader, arch_optimizer, net_optimizer, criterion, device)
@@ -439,7 +461,9 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                if tqdm in sys.modules:
+                try:
+                    run_loader.happyInterestingFlag
+                except:
                     run_loader.set_description(f"{running_loss/i:.4f}")
     
     def test(self, loader, device):
