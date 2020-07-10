@@ -4,27 +4,27 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from tqdm import tqdm
+# from tqdm import tqdm
 import copy
 import sys
 import numpy as np
 
-# class tqdm():
-#     def __init__(self, x):
-#         self.x = x
-#         self.happyInterestingFlag = True
+class tqdm():
+    def __init__(self, x):
+        self.x = x
+        self.happyInterestingFlag = True
 
-#     def __enter__(self):
-#         return self
+    def __enter__(self):
+        return self
     
-#     def __exit__(self ,type, value, traceback):
-#         pass
+    def __exit__(self ,type, value, traceback):
+        pass
 
-#     def __iter__(self):
-#         return iter(self.x)
+    def __iter__(self):
+        return iter(self.x)
 
-#     def __next__(self):
-#         return next(self.x)
+    def __next__(self):
+        return next(self.x)
 
 def n_para(module:nn.Module, input_size:torch.Size):
     ic = module.in_channels
