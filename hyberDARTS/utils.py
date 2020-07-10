@@ -25,20 +25,35 @@ def working_set(record, size):
         WSSize.append(WSSizeLine)
     return WS, WSSize
 
-def min_working_set(WS, WSSize):
-    size = np.ones(len(WS))
-    for j in range(len(WSSize[0])):
-        for i in range(len(WSSize)):
-            size[i] *= WSSize[i][j]
-    index = size.argmin()
+def min_working_set(WS, WSSize, find_type):
+    if find_type == "mult":
+        size = np.ones(len(WS[0]))
+        for j in range(len(WSSize[0])):
+            for i in range(len(WSSize)):
+                size[j] *= WSSize[i][j]
+        index = size.argmin()
+    elif find_type == "add":
+        size = np.zeros(len(WS[0]))
+        for j in range(len(WSSize[0])):
+            for i in range(len(WSSize)):
+                size[j] += WSSize[i][j]
+        index = size.argmin()
+    elif find_type == "comp":
+        size = np.zeros(len(WS[0]))
+        for j in range(len(WSSize[0])):
+            for i in range(len(WSSize)):
+                for k in range(len(WS[i][j])):
+                    size[j] += (WS[i][j][k] * 2 + 1) **2
+        index = size.argmin()
+    print(size)
     subspace = []
     for item in WS:
         subspace.append(item[index])
     return subspace
 
-def min_subspace(record, size):
+def min_subspace(record, size, find_type = "mult"):
     WS, WSSize = working_set(record, 9)
-    subspace = min_working_set(WS, WSSize)
+    subspace = min_working_set(WS, WSSize, find_type)
     return subspace
 
 

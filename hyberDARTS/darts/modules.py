@@ -4,27 +4,27 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-# from tqdm import tqdm
+from tqdm import tqdm
 import copy
 import sys
 import numpy as np
 
-class tqdm():
-    def __init__(self, x):
-        self.x = x
-        self.happyInterestingFlag = True
+# class tqdm():
+#     def __init__(self, x):
+#         self.x = x
+#         self.happyInterestingFlag = True
 
-    def __enter__(self):
-        return self
+#     def __enter__(self):
+#         return self
     
-    def __exit__(self ,type, value, traceback):
-        pass
+#     def __exit__(self ,type, value, traceback):
+#         pass
 
-    def __iter__(self):
-        return iter(self.x)
+#     def __iter__(self):
+#         return iter(self.x)
 
-    def __next__(self):
-        return next(self.x)
+#     def __next__(self):
+#         return next(self.x)
 
 def n_para(module:nn.Module, input_size:torch.Size):
     ic = module.in_channels
@@ -305,8 +305,10 @@ class SuperNet(nn.Module):
         # arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()]
 
         # without hardware
-        arch_grads_f = [copy.deepcopy(gf.grad) for gf in self.get_arch_params()]
-        net_grads_f  = [copy.deepcopy(gf.grad) for gf in self.get_net_params()]
+        # TODO: want to see if I can change it back to gf.grad.data
+        arch_grads_f = [copy.deepcopy(gf.grad.data) for gf in self.get_arch_params()[:-1]]
+        arch_grads_f.append(copy.deepcopy(self.get_arch_params()[-1].grad))
+        net_grads_f  = [copy.deepcopy(gf.grad.data) for gf in self.get_net_params()]
         # net_optimizer.zero_grad()
         arch_optimizer.zero_grad()
         arch_grads_s_p = self.get_unrolled_model_grad(True, net_grads_f, arch_inputs, arch_labels, criterion, eps)

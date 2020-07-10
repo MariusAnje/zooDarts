@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser('Parser User Input Arguments')
 parser.add_argument(
     'mode',
     default='nas',
-    choices=['nas', 'joint', 'nested', 'quantization'],
+    choices=['nas', 'darts', 'all', 'joint', 'nested', 'quantization'],
     help="supported dataset including : 1. nas (default), 2. joint"
     )
 parser.add_argument(
@@ -154,6 +154,7 @@ parser.add_argument('--train_epochs', action="store", type = int, default = 10)
 parser.add_argument('--log_filename', action="store", type = str, default = "./experiment/log")
 parser.add_argument('--device', action="store", type = str, default = "cuda:0")
 parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
+parser.add_argument('--rollout_filename', action="store", type = str, default = "./experiment/rollout")
 args = parser.parse_args()
 args.device = f"cuda:{args.gpu}"
 args.batchSize = args.batch_size
@@ -183,24 +184,6 @@ def get_logger(filepath=None):
         file_handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(file_handler)
     return logger
-
-
-def main():
-    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available()
-                          else "cpu")
-    print(f"using device {device}")
-    dir = os.path.join(
-        f'experiment',
-        args.mode,
-        'non_linear' if args.skip else 'linear',
-        ('without' if args.no_stride else 'with') + ' stride, ' +
-        ('without' if args.no_pooling else 'with') + ' pooling',
-        args.dataset + f"({args.layers} layers)"
-        )
-    if os.path.exists(dir) is False:
-        os.makedirs(dir)
-    SCRIPT[args.mode](device, dir)
-
 
 def nas(device, dir='experiment'):
     filepath = os.path.join(dir, f"nas ({args.episodes} episodes)")
@@ -277,10 +260,10 @@ def nas(device, dir='experiment'):
 
 
     # rollout_record = torch.load("rollout_record")
-    darts(rollout_record)
+    return rollout_record
     
 
-def darts(rollout_record):
+def darts(subspace):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
@@ -327,7 +310,6 @@ def darts(rollout_record):
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
 
     logging.debug("Creating model")
-    subspace = utils.min_subspace(rollout_record, 9)
     superModel = SuperNet()
     superModel.get_model(SubCIFARNet(subspace))
     archParams = superModel.get_arch_params()
@@ -369,16 +351,44 @@ def darts(rollout_record):
         logging.debug(superModel.get_arch_params())
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     
+def ruleAll(device, dir='experiment'):
+    rollout_record = nas(device, dir)
+    subspace = utils.min_subspace(rollout_record, 9)
+    print(subspace)
+    darts(subspace)
+
+def darts_only(device, dir='experiment'):
+    rollout_record = torch.load(args.rollout_filename)
+    subspace = utils.min_subspace(rollout_record, 9, "comp")
+    print(subspace)
+    darts(subspace)
 
 SCRIPT = {
     'nas': nas,
-    # 'joint': sync_search,
+    'all': ruleAll,
+    'darts': darts_only
     # 'nested': nested_search,
     # 'quantization': quantization_search
 }
 
+def main():
+    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available()
+                          else "cpu")
+    print(f"using device {device}")
+    dir = os.path.join(
+        f'experiment',
+        args.mode,
+        'non_linear' if args.skip else 'linear',
+        ('without' if args.no_stride else 'with') + ' stride, ' +
+        ('without' if args.no_pooling else 'with') + ' pooling',
+        args.dataset + f"({args.layers} layers)"
+        )
+    if os.path.exists(dir) is False:
+        os.makedirs(dir)
+    SCRIPT[args.mode](device, dir)
+
 if __name__ == '__main__':
     import random
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
+    # torch.manual_seed(args.seed)
+    # random.seed(args.seed)
     main()
