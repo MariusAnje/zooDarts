@@ -10,5 +10,6 @@
 
 module load pytorch
 
-python -u main.py nas -ns -e 30 -ep 80 --train_epochs 60
-# python -u main.py nas -ns -e 1 -ep 10 --train_epochs 1
+# python -u main.py all -ns -e 30 -ep 80 --train_epochs 60
+# python -u main.py all -ns -e 1 -ep 10 --train_epochs 1
+python -u main.py darts -ns -e 30 -ep 80 --train_epochs 60 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2

@@ -58,6 +58,7 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
     trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
     # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
     # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
     # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
@@ -65,9 +66,12 @@ if __name__ == "__main__":
     trainset_in_memory = []
     for data in trainset:
         trainset_in_memory.append(data)
+    testset_in_memory = []
+    for data in testset:
+        testset_in_memory.append(data)
+    
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
-    archLoader  = torch.utils.data.DataLoader(trainset_in_memory, batch_size=args.batchSize, shuffle=True)
-    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
 
     logging.debug("Creating model")

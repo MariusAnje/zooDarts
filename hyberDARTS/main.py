@@ -260,7 +260,7 @@ def nas(device, dir='experiment'):
 
 
     # rollout_record = torch.load("rollout_record")
-    return rollout_record
+    return rollout_record, best_samples
     
 
 def darts(subspace):
@@ -276,7 +276,7 @@ def darts(subspace):
                         format='%(asctime)s %(levelname)-8s %(message)s')
 
     logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
-    logging.info(args.ex_info)
+    logging.info(args.ex_info + f"e{args.epochs} ep{args.episodes} test{args.train_epochs} file_{args.rollout_filename}")
     
     # Find dataset. I use both windows (desktop) and Linux (server)
     # "nt" for dataset stored on windows machine and else for dataset stored on Linux
@@ -297,6 +297,7 @@ def darts(subspace):
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
     trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
     # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
     # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
     # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
@@ -304,9 +305,12 @@ def darts(subspace):
     trainset_in_memory = []
     for data in trainset:
         trainset_in_memory.append(data)
+    testset_in_memory = []
+    for data in testset:
+        testset_in_memory.append(data)
+
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
-    archLoader  = torch.utils.data.DataLoader(trainset_in_memory, batch_size=args.batchSize, shuffle=True)
-    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
 
     logging.debug("Creating model")
@@ -330,18 +334,13 @@ def darts(subspace):
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")
 
-    c_gradT = []
-    l_gradT = []
     debug = False
+    best_acc = 0
+    best_rollout = 0
     for i in range(args.train_epochs):
         # Train the super net
         superModel.modify_super(True)
-        if debug:
-            c_gradList, l_gradList = superModel.train_debug(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
-            c_gradT.append(c_gradList)
-            l_gradT.append(l_gradList)
-        else:
-            superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+        superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
         superAcc = superModel.test(testloader, device)
         # Test the chosen modules
         superModel.modify_super(False)
@@ -349,19 +348,27 @@ def darts(subspace):
         logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
         logging.info(f"           arch: {superModel.get_module_choice()}")
         logging.debug(superModel.get_arch_params())
+        # record the best rollout
+        if acc > best_acc:
+            best_acc = acc
+            best_rollout = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
+        return best_rollout
+
+def finetune(rollout):
+    pass
     
 def ruleAll(device, dir='experiment'):
-    rollout_record = nas(device, dir)
-    subspace = utils.min_subspace(rollout_record, 9)
+    rollout_record, best_samples = nas(device, dir)
+    subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    darts(subspace)
+    best_rollout = darts(subspace)
 
 def darts_only(device, dir='experiment'):
     rollout_record = torch.load(args.rollout_filename)
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    darts(subspace)
+    best_rollout = darts(subspace)
 
 SCRIPT = {
     'nas': nas,
