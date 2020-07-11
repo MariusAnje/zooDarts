@@ -355,8 +355,10 @@ def darts(subspace):
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     return best_rollout
 
-def finetune(rollout):
+def finetune(device, rollout):
     pass
+
+
     
 def ruleAll(device, dir='experiment'):
     rollout_record, dr_rollout = nas(device, dir)
@@ -370,9 +372,6 @@ def darts_only(device, dir='experiment'):
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
     rl_rollout = darts(subspace)
-    model = ChildCIFARNet(rl_rollout)
-    x = torch.randn(4,3,32,32)
-    model(x)
 
 SCRIPT = {
     'nas': nas,

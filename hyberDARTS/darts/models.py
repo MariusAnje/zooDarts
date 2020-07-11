@@ -93,7 +93,7 @@ class SubCIFARNet(nn.Module):
 
 class ChildCIFARNet(nn.Module):
     def __init__(self, rollout, num_classes = 10):
-        super(SubCIFARNet, self).__init__()
+        super(ChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
         out_channels = [128, 128, 256, 256, 512, 512]
