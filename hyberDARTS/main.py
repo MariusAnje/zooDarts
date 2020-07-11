@@ -33,6 +33,7 @@ from darts.modules import SuperNet, MixedBlock
 from darts.models import SubCIFARNet, ChildCIFARNet
 
 import utils
+import finetune
 
 
 
@@ -354,24 +355,22 @@ def darts(subspace):
             best_rollout = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     return best_rollout
-
-def finetune(device, rollout):
-    pass
-
-
     
 def ruleAll(device, dir='experiment'):
     rollout_record, dr_rollout = nas(device, dir)
-    dr_rollout = utils.RL2DR_rollout(dr_rollout)
+    rl_rollout = utils.RL2DR_rollout(dr_rollout)
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    rl_rollout = darts(subspace)
+    dr_rollout = darts(subspace)
+    print("RL best arch acc: ", finetune.main(device, rl_rollout, 60, args))
+    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
 def darts_only(device, dir='experiment'):
     rollout_record = torch.load(args.rollout_filename)
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    rl_rollout = darts(subspace)
+    dr_rollout = darts(subspace)
+    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
 SCRIPT = {
     'nas': nas,

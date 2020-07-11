@@ -99,4 +99,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     rollout = [1,1,1,1,1,1]
     device = torch.device("cuda:0")
-    print(main(device, rollout, 10, args))
+    print(main(device, rollout, 3, args))
