@@ -3,7 +3,7 @@
 #$ -M zyan2@nd.edu
 #$ -m abe
 #$ -r y
-#$ -q gpu
+#$ -q gpu@qa-1080ti-*
 #$ -N RLDR
 #$ -pe smp 4
 #$ -l gpu=1
@@ -11,5 +11,6 @@
 module load pytorch
 
 # python -u main.py all -ns -e 30 -ep 80 --train_epochs 60
-# python -u main.py all -ns -e 1 -ep 10 --train_epochs 1
-python -u main.py darts -ns -e 30 -ep 80 --train_epochs 60 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2
+python -u main.py all -ns -e 1 -ep 10 --train_epochs 1 --ex_info "all test"
+# python -u main.py darts -ns -e 1 -ep 1 --train_epochs 1 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2 --ex_info "darts test"
+# python -u main.py darts -ns -e 30 -ep 80 --train_epochs 60 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2
