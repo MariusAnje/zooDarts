@@ -91,6 +91,33 @@ class SubCIFARNet(nn.Module):
         x = self.classifier(x.view(-1, 512*4*4))
         return x
 
+class ChildCIFARNet(nn.Module):
+    def __init__(self, rollout, num_classes = 10):
+        super(SubCIFARNet, self).__init__()
+        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        # modules = ["CONV1","CONV3", "CONV5"]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        in_channels = 3
+
+        norm = True
+        moduleList = []
+        for i in range(6):
+            moduleList.append(LayerBlock(modules[rollout[i]], in_channels, out_channels[i], norm))
+            in_channels = out_channels[i]
+            if i in [1,3,5]:
+                moduleList.append(nn.MaxPool2d(2))
+        self.feature = nn.Sequential(*moduleList)
+        self.classifier = nn.Sequential(
+            nn.Linear(512*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.feature(x)
+        x = self.classifier(x.view(-1, 512*4*4))
+        return x
+
 class OriNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(OriNet, self).__init__()

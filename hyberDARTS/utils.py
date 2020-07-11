@@ -56,6 +56,13 @@ def min_subspace(record, size, find_type = "mult"):
     subspace = min_working_set(WS, WSSize, find_type)
     return subspace
 
+def RL2DR_rollout(rl_rollout):
+    usefulList = [0, 4, 8, 12, 16, 20]
+    dr_rollout = []
+    for i in usefulList:
+        dr_rollout.append(rl_rollout[i])
+    return dr_rollout
+
 
 if __name__ == "__main__":
     import torch

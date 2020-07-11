@@ -30,7 +30,7 @@ from RL import utility
 
 from darts import modules
 from darts.modules import SuperNet, MixedBlock
-from darts.models import SubCIFARNet
+from darts.models import SubCIFARNet, ChildCIFARNet
 
 import utils
 
@@ -260,7 +260,7 @@ def nas(device, dir='experiment'):
 
 
     # rollout_record = torch.load("rollout_record")
-    return rollout_record, best_samples
+    return rollout_record, best_samples.rollout_list[0]
     
 
 def darts(subspace):
@@ -353,22 +353,26 @@ def darts(subspace):
             best_acc = acc
             best_rollout = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
-        return best_rollout
+    return best_rollout
 
 def finetune(rollout):
     pass
     
 def ruleAll(device, dir='experiment'):
-    rollout_record, best_samples = nas(device, dir)
+    rollout_record, dr_rollout = nas(device, dir)
+    dr_rollout = utils.RL2DR_rollout(dr_rollout)
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    best_rollout = darts(subspace)
+    rl_rollout = darts(subspace)
 
 def darts_only(device, dir='experiment'):
     rollout_record = torch.load(args.rollout_filename)
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
-    best_rollout = darts(subspace)
+    rl_rollout = darts(subspace)
+    model = ChildCIFARNet(rl_rollout)
+    x = torch.randn(4,3,32,32)
+    model(x)
 
 SCRIPT = {
     'nas': nas,
