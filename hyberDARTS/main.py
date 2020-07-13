@@ -268,7 +268,7 @@ def darts(subspace):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
-    streamHandler.setLevel(logging.DEBUG)
+    streamHandler.setLevel(logging.INFO)
     logging.basicConfig(
                         handlers=[
                                     fileHandler,
@@ -366,7 +366,7 @@ def ruleAll(device, dir='experiment'):
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
 def darts_only(device, dir='experiment'):
-    rollout_record = torch.load(args.rollout_filename)
+    rollout_record = torch.load(args.rollout_filename)[:args.episodes]
     subspace = utils.min_subspace(rollout_record, 9, "comp")
     print(subspace)
     dr_rollout = darts(subspace)

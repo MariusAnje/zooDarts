@@ -88,7 +88,7 @@ def main(device, rollout, epochs, args):
     for _ in range(epochs):
         train(device, trainLoader, criterion, optimizer, model)
         acc = test(device, testloader, criterion, optimizer, model)
-        print(acc)
+        # print(acc)
         if acc > best_acc:
             best_acc = acc
     return best_acc
@@ -98,5 +98,6 @@ if __name__ == "__main__":
     parser.add_argument('--batchSize', action="store", type=int, default=64)
     args = parser.parse_args()
     rollout = [1,1,1,1,1,1]
+    print("Rollout:", rollout)
     device = torch.device("cuda:0")
-    print(main(device, rollout, 3, args))
+    print("Best accuracy", main(device, rollout, 60, args))
