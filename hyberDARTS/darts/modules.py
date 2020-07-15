@@ -366,6 +366,40 @@ class SuperNet(nn.Module):
                 self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
                 arch_optimizer.step()
     
+    def train_short(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device, stop):
+        """
+            trains the super net
+            Used to get better understanding of memory consumption, a debug function
+        """
+        self.model.train()
+
+        loss_list = []
+        avg_size = 100
+        running_loss = 0.0
+        i = 0
+        # arch_loader = iter(arch_loader)
+        with tqdm(net_loader) as run_loader:
+            for inputs, labels in run_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                net_optimizer.zero_grad()
+                arch_optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = criterion(outputs, labels)
+                loss_list.append(loss.data.clone())
+                running_loss += loss
+                loss.backward()
+                net_optimizer.step()
+                i += 1
+                try:
+                    run_loader.happyInterestingFlag
+                except:
+                    run_loader.set_description(f"{running_loss/i:.4f}")
+
+                self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
+                arch_optimizer.step()
+                if i == stop:
+                    break
+
     def train_debug(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
         """
             trains the super net
