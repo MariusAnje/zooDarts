@@ -52,7 +52,7 @@ def min_working_set(WS, WSSize, find_type):
     return subspace
 
 def min_subspace(record, size, find_type = "mult"):
-    WS, WSSize = working_set(record, 9)
+    WS, WSSize = working_set(record, size)
     subspace = min_working_set(WS, WSSize, find_type)
     return subspace
 

@@ -156,6 +156,8 @@ parser.add_argument('--log_filename', action="store", type = str, default = "./e
 parser.add_argument('--device', action="store", type = str, default = "cuda:0")
 parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
 parser.add_argument('--rollout_filename', action="store", type = str, default = "./experiment/rollout")
+parser.add_argument('--method', action="store", type = str, default = "comp")
+parser.add_argument('--wsSize', action="store", type = int, default = 9)
 args = parser.parse_args()
 args.device = f"cuda:{args.gpu}"
 args.batchSize = args.batch_size
@@ -277,7 +279,7 @@ def darts(subspace):
                         format='%(asctime)s %(levelname)-8s %(message)s')
 
     logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
-    logging.info(args.ex_info + f"e{args.epochs} ep{args.episodes} test{args.train_epochs} file_{args.rollout_filename}")
+    logging.info(args.ex_info + f" method:{args.method} e{args.epochs} ep{args.episodes} test{args.train_epochs} file_{args.rollout_filename} {args.method} wsSize:{args.wsSize}" )
     
     # Find dataset. I use both windows (desktop) and Linux (server)
     # "nt" for dataset stored on windows machine and else for dataset stored on Linux
@@ -359,7 +361,7 @@ def darts(subspace):
 def ruleAll(device, dir='experiment'):
     rollout_record, dr_rollout = nas(device, dir)
     rl_rollout = utils.RL2DR_rollout(dr_rollout)
-    subspace = utils.min_subspace(rollout_record, 9, "comp")
+    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
     print(subspace)
     dr_rollout = darts(subspace)
     print("RL best arch acc: ", finetune.main(device, rl_rollout, 60, args))
@@ -367,7 +369,7 @@ def ruleAll(device, dir='experiment'):
 
 def darts_only(device, dir='experiment'):
     rollout_record = torch.load(args.rollout_filename)[:args.episodes]
-    subspace = utils.min_subspace(rollout_record, 9, "comp")
+    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
     print(subspace)
     dr_rollout = darts(subspace)
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
