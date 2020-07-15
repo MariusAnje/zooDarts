@@ -204,7 +204,7 @@ def darts_memory(subspaces):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
-    streamHandler.setLevel(logging.INFO)
+    streamHandler.setLevel(logging.DEBUG)
     logging.basicConfig(
                         handlers=[
                                     # fileHandler,
@@ -238,9 +238,6 @@ def darts_memory(subspaces):
     # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
     # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
     logging.debug("Caching data")
-    trainset_in_memory = []
-    for data in trainset:
-        trainset_in_memory.append(data)
     testset_in_memory = []
     for data in testset:
         testset_in_memory.append(data)
@@ -268,6 +265,7 @@ def darts_memory(subspaces):
         superModel.modify_super(True)
         superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
         smi_trace = subprocess.check_output("nvidia-smi")
+        print(smi_trace)
         memory_size = parse_smi(smi_trace, args.gpu)
         print(memory_size)
 
