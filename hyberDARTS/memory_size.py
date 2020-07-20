@@ -299,11 +299,11 @@ def memory(device, dir='experiment'):
     darts_memory(subspaces)
 
 def from_trace(device, dir='experiment'):
-    rollout_record = torch.load(args.rollout_filename)[:args.episodes]
+    th = 5000
     subspaces = []
-    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
-    print(subspaces)
+    subspace = utils.accuracy_analysis(fn = args.rollout_filename, ep = args.episodes, th)
     subspaces.append(subspace)
+    print(subspaces)
     darts_memory(subspaces)
 
 SCRIPT = {
