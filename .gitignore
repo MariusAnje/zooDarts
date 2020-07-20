@@ -16,3 +16,4 @@ data/
 debug*
 experiment*
 rollout_record
+*.ipynb

@@ -298,8 +298,17 @@ def memory(device, dir='experiment'):
     subspaces = generate_subspaces(args.size)
     darts_memory(subspaces)
 
+def from_trace(device, dir='experiment'):
+    rollout_record = torch.load(args.rollout_filename)[:args.episodes]
+    subspaces = []
+    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
+    print(subspaces)
+    subspaces.append(subspace)
+    darts_memory(subspaces)
+
 SCRIPT = {
-    'darts': memory
+    'darts':  from_trace,
+    'memory': memory
     # 'nested': nested_search,
     # 'quantization': quantization_search
 }

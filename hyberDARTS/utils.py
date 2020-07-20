@@ -63,6 +63,10 @@ def RL2DR_rollout(rl_rollout):
         dr_rollout.append(rl_rollout[i])
     return dr_rollout
 
+def memory_size(subspace):
+    pass
+
+
 
 if __name__ == "__main__":
     import torch
