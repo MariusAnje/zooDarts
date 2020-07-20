@@ -16,4 +16,5 @@ backup/
 data/
 debug*
 experiment*
-rollout_record*
+*rollout_record*
+*.ipynb

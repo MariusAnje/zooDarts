@@ -298,8 +298,17 @@ def memory(device, dir='experiment'):
     subspaces = generate_subspaces(args.size)
     darts_memory(subspaces)
 
+def from_trace(device, dir='experiment'):
+    th = 5000
+    subspaces = []
+    subspace = utils.accuracy_analysis(fn = args.rollout_filename, ep = args.episodes, th)
+    subspaces.append(subspace)
+    print(subspaces)
+    darts_memory(subspaces)
+
 SCRIPT = {
-    'darts': memory
+    'darts':  from_trace,
+    'memory': memory
     # 'nested': nested_search,
     # 'quantization': quantization_search
 }
