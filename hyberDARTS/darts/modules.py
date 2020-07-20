@@ -4,27 +4,31 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-# from tqdm import tqdm
 import copy
 import sys
 import numpy as np
 
-class tqdm():
-    def __init__(self, x):
-        self.x = x
-        self.happyInterestingFlag = True
+GETTQDM = True
 
-    def __enter__(self):
-        return self
-    
-    def __exit__(self ,type, value, traceback):
-        pass
+if GETTQDM:
+    from tqdm import tqdm
+else:
+    class tqdm():
+        def __init__(self, x):
+            self.x = x
+            self.happyInterestingFlag = True
 
-    def __iter__(self):
-        return iter(self.x)
+        def __enter__(self):
+            return self
+        
+        def __exit__(self ,type, value, traceback):
+            pass
 
-    def __next__(self):
-        return next(self.x)
+        def __iter__(self):
+            return iter(self.x)
+
+        def __next__(self):
+            return next(self.x)
 
 def n_para(module:nn.Module, input_size:torch.Size):
     ic = module.in_channels
@@ -96,7 +100,7 @@ class MixedHW(nn.Module):
         """
         self.HW = np.random.randn(num)
         self.HW = self.HW - self.HW.min()
-        self.HW = self.HW/self.HW.max()
+        self.HW = (self.HW/self.HW.max()) + 1
     
     def init_latency(self, name, module, input_size):
         """
@@ -167,7 +171,7 @@ class SuperNet(nn.Module):
         super(SuperNet, self).__init__()
         self.model = None
         self.is_super = True
-        self.HW = MixedHW(5)
+        self.HW = MixedHW(2)
     
     def get_model(self, model):
         """
@@ -234,8 +238,13 @@ class SuperNet(nn.Module):
             get the loss used to update architecture parameters
             returns a scaler
         """
+        alpha = 0.1
+        beta = 0.5
+        # print(self.get_latency())
+        # print(self.get_latency().log())
+        # exit()
         # return - (1 - criterion(arch_outputs, arch_labels))* self.get_latency() * 1e-8
-        return criterion(arch_outputs, arch_labels)
+        return criterion(arch_outputs, arch_labels) * (alpha * self.get_latency().log()).pow(beta)
     
     def get_arch_loss_debug(self, criterion, arch_outputs, arch_labels):
         """
@@ -325,6 +334,7 @@ class SuperNet(nn.Module):
                     param.grad = arch_grads_f[i]
             else:
                 param.grad.data = arch_grads_f[i] - (arch_grads_s_p[i] - arch_grads_s_n[i])/(2*eps)
+        return arch_loss
 
 
     def train(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device):
@@ -336,6 +346,7 @@ class SuperNet(nn.Module):
         loss_list = []
         avg_size = 100
         running_loss = 0.0
+        running_arch_loss = 0.0
         i = 0
         # arch_loader = iter(arch_loader)
         with tqdm(net_loader) as run_loader:
@@ -350,10 +361,6 @@ class SuperNet(nn.Module):
                 loss.backward()
                 net_optimizer.step()
                 i += 1
-                try:
-                    run_loader.happyInterestingFlag
-                except:
-                    run_loader.set_description(f"{running_loss/i:.4f}")
                 
                 # arch_data = next(iter(arch_loader))
                 # net_optimizer.zero_grad()
@@ -363,8 +370,14 @@ class SuperNet(nn.Module):
                 # arch_outputs = self.model(arch_inputs)
                 # arch_loss = criterion(arch_outputs, arch_labels)
                 # arch_loss.backward()
-                self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
+
+                arch_loss = self.unroll(arch_loader, arch_optimizer, net_optimizer, criterion, device)
+                running_arch_loss += arch_loss.item()
                 arch_optimizer.step()
+                try:
+                    run_loader.happyInterestingFlag
+                except:
+                    run_loader.set_description(f"{running_loss/i:.4f}, {running_arch_loss/i:.4f}")
     
     def train_short(self, net_loader, arch_loader, arch_optimizer, net_optimizer, criterion, device, stop):
         """

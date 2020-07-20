@@ -16,7 +16,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch Classification Training')
 
-    parser.add_argument('--batchSize', action="store", type=int, default=64)
+    parser.add_argument('--batchSize', action="store", type=int, default=128)
     parser.add_argument('--pretrained', action="store_true")
     parser.add_argument('--train_epochs', action="store", type = int, default = 10)
     parser.add_argument('--log_filename', action="store", type = str, default = "log")
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     # Warm up. Well, DK if warm up is needed
     # For latency, I would think of two methods. Warming only weights is one
     # Warming also arch without latency is even more interesting
-    for i in range(5):
+    for i in range(0):
         superModel.modify_super(True)
         superModel.warm(trainLoader, netOptimizer, criterion, device)
         logging.debug(f"           arch: {superModel.get_arch_params()}")

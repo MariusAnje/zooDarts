@@ -153,12 +153,12 @@ parser.add_argument(
 parser.add_argument('--batchSize', action="store", type=int, default=64)
 parser.add_argument('--pretrained', action="store_true")
 parser.add_argument('--train_epochs', action="store", type = int, default = 10)
-parser.add_argument('--log_filename', action="store", type = str, default = "./experiment/log")
+parser.add_argument('--log_filename', action="store", type = str, default = "./experiment/dr_memory")
 parser.add_argument('--device', action="store", type = str, default = "cuda:0")
 parser.add_argument('--ex_info', action="store", type = str, default = "nothing special")
 parser.add_argument('--rollout_filename', action="store", type = str, default = "./experiment/rollout")
 parser.add_argument('--method', action="store", type = str, default = "comp")
-parser.add_argument('--wsSize', action="store", type = int, default = 9)
+parser.add_argument('--size', action="store", type = int, default = 9)
 args = parser.parse_args()
 args.device = f"cuda:{args.gpu}"
 args.batchSize = args.batch_size
@@ -176,6 +176,7 @@ if args.no_pooling is True:
 
 
 def parse_smi(smi_trace, gpu):
+    smi_trace = smi_trace.splitlines()
     cleared = []
     for line in smi_trace:
         line = str(line)
@@ -183,6 +184,23 @@ def parse_smi(smi_trace, gpu):
         if index != -1:
             cleared.append(int(line[index-5:index]))
     return(cleared[gpu])
+
+def generate_subspaces(sample_size):
+    subspace_list= []
+    full_space = [0,1,2,3]
+    i = 0
+    j = 0
+    while(True):
+        subspace = []
+        for _ in range(6):
+            subspace.append(list(np.sort(np.random.choice(full_space,np.random.randint(1,5),False))))
+        if not (subspace in subspace_list):
+            subspace_list.append(subspace)
+            i += 1
+        j += 1
+        if i >= sample_size:
+            break
+    return subspace_list
 
 
 def get_logger(filepath=None):
@@ -207,7 +225,7 @@ def darts_memory(subspaces):
     streamHandler.setLevel(logging.DEBUG)
     logging.basicConfig(
                         handlers=[
-                                    # fileHandler,
+                                    fileHandler,
                                     streamHandler],
                         level= logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s')
@@ -246,8 +264,10 @@ def darts_memory(subspaces):
     archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
 
+    size_record = []
+
     for subspace in subspaces:
-        logging.debug("Creating model")
+        # logging.debug("Creating model")
         superModel = SuperNet()
         superModel.get_model(SubCIFARNet(subspace))
         archParams = superModel.get_arch_params()
@@ -256,22 +276,26 @@ def darts_memory(subspaces):
         archOptimizer = optim.Adam(archParams,lr = 0.1)
         netOptimizer  = optim.Adam(netParams, lr = 1e-3)
         criterion = nn.CrossEntropyLoss()
+        torch.cuda.empty_cache()
         # GPU or CPU
         device = torch.device(args.device)
         superModel.to(device)
+        
 
         best_rollout = 0
         # Train the super net
         superModel.modify_super(True)
         superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
-        smi_trace = subprocess.check_output("nvidia-smi")
-        print(smi_trace)
-        memory_size = parse_smi(smi_trace, args.gpu)
-        print(memory_size)
+        # smi_trace = subprocess.check_output("nvidia-smi")
+        # memory_size = parse_smi(smi_trace, args.gpu)
+        memory_size = torch.cuda.memory_cached(device)/1024/1024
+        logging.info(f"{subspace}, {memory_size}")
+        size_record.append((subspace, memory_size))
 
+    torch.save(size_record, "dr_memory_record_new_" + time.strftime("%m%d_%H%M_%S",time.localtime()))
 
 def memory(device, dir='experiment'):
-    subspaces = [[[1,2],[1,0],[1,2],[1,3],[1,2],[1,3]],[[2,0],[2,1],[2,3],[2,0],[2,1],[2,0]]]
+    subspaces = generate_subspaces(args.size)
     darts_memory(subspaces)
 
 SCRIPT = {

@@ -9,8 +9,8 @@ from modules import LayerBlock, MixedBlock
 class SuperCIFARNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperCIFARNet, self).__init__()
-        # modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        modules = ["CONV1","CONV3", "CONV5"]
+        modules = ["CONV7", "CONV7", "CONV7"]
+        # modules = ["CONV1","CONV3", "CONV5", "CONV7"]
         norm = True
         self.block1 = MixedBlock(self.createConvList(modules, 3, 128, norm))
         self.block2 = MixedBlock(self.createConvList(modules, 128, 128, norm))
