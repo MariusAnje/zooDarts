@@ -29,8 +29,8 @@ from RL.fpga.model import FPGAModel
 from RL import utility
 
 from darts import modules
-from darts.modules import SuperNet, MixedBlock
-from darts.models import SubCIFARNet, ChildCIFARNet
+from darts.modules import SuperNet#, MixedBlock
+from darts.models import SubCIFARNet, ChildCIFARNet, SuperCIFARNet
 
 import utils
 import finetune
@@ -43,7 +43,7 @@ parser = argparse.ArgumentParser('Parser User Input Arguments')
 parser.add_argument(
     'mode',
     default='nas',
-    choices=['nas', 'darts', 'all', 'joint', 'nested', 'quantization'],
+    choices=['nas', 'darts', 'memory', 'joint', 'nested', 'quantization'],
     help="supported dataset including : 1. nas (default), 2. joint"
     )
 parser.add_argument(
@@ -76,9 +76,9 @@ parser.add_argument(
 parser.add_argument(
     '-ep', '--episodes',
     type=int,
-    default=2000,
+    default=80,
     help='''the number of episodes for training the policy network, default
-        is 2000'''
+        is 80'''
     )
 parser.add_argument(
     '-ep1', '--episodes1',
@@ -160,7 +160,8 @@ parser.add_argument('--rollout_filename', action="store", type = str, default = 
 parser.add_argument('--method', action="store", type = str, default = "comp")
 parser.add_argument('--size', action="store", type = int, default = 9)
 args = parser.parse_args()
-args.device = f"cuda:{args.gpu}"
+if args.gpu != 0:
+    args.device = f"cuda:{args.gpu}"
 args.batchSize = args.batch_size
 
 
@@ -218,7 +219,7 @@ def get_logger(filepath=None):
     return logger
     
 
-def darts_memory(subspaces):
+def darts_memory(subspaces, extra_info = ""):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
@@ -270,6 +271,7 @@ def darts_memory(subspaces):
         # logging.debug("Creating model")
         superModel = SuperNet()
         superModel.get_model(SubCIFARNet(subspace))
+        # superModel.get_model(SuperCIFARNet())
         archParams = superModel.get_arch_params()
         netParams  = superModel.get_net_params()
         # Training optimizers
@@ -286,25 +288,106 @@ def darts_memory(subspaces):
         # Train the super net
         superModel.modify_super(True)
         superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
-        # smi_trace = subprocess.check_output("nvidia-smi")
-        # memory_size = parse_smi(smi_trace, args.gpu)
+        # superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
         memory_size = torch.cuda.memory_cached(device)/1024/1024
-        logging.info(f"{subspace}, {memory_size}")
+        logging.info(f"{extra_info}: {subspace}, {memory_size}")
         size_record.append((subspace, memory_size))
 
     torch.save(size_record, "dr_memory_record_new_" + time.strftime("%m%d_%H%M_%S",time.localtime()))
 
+def darts_memory_trace(subspaces):
+    fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
+    fileHandler.setLevel(logging.INFO)
+    streamHandler = logging.StreamHandler()
+    streamHandler.setLevel(logging.DEBUG)
+    logging.basicConfig(
+                        handlers=[
+                                    fileHandler,
+                                    streamHandler],
+                        level= logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s')
+
+    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+    
+    # Find dataset. I use both windows (desktop) and Linux (server)
+    # "nt" for dataset stored on windows machine and else for dataset stored on Linux
+    if os.name == "nt":
+        dataPath = "~/testCode/data"
+    elif os.path.expanduser("~")[-5:] == "zyan2":
+        dataPath = "~/Private/data/CIFAR10"
+    else:
+        dataPath = "/dataset/CIFAR10"
+    
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
+    # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
+    # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
+    logging.debug("Caching data")
+    testset_in_memory = []
+    for data in testset:
+        testset_in_memory.append(data)
+
+    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
+    archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+
+    size_record = []
+
+    i = 0
+    for subspace, ep, th in subspaces:
+        # logging.debug("Creating model")
+        superModel = SuperNet()
+        superModel.get_model(SubCIFARNet(subspace))
+        # superModel.get_model(SuperCIFARNet())
+        archParams = superModel.get_arch_params()
+        netParams  = superModel.get_net_params()
+        # Training optimizers
+        archOptimizer = optim.Adam(archParams,lr = 0.1)
+        netOptimizer  = optim.Adam(netParams, lr = 1e-3)
+        criterion = nn.CrossEntropyLoss()
+        torch.cuda.empty_cache()
+        # GPU or CPU
+        device = torch.device(args.device)
+        superModel.to(device)
+        
+
+        best_rollout = 0
+        # Train the super net
+        superModel.modify_super(True)
+        superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
+        # superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+        memory_size = torch.cuda.memory_cached(device)/1024/1024
+        logging.info(f"ep:{ep}, th:{th} --> {subspace}, {memory_size}")
+        size_record.append((subspace, memory_size))
+
+    # torch.save(size_record, "dr_memory_record_new_" + time.strftime("%m%d_%H%M_%S",time.localtime()))
+
 def memory(device, dir='experiment'):
     subspaces = generate_subspaces(args.size)
+    # subspaces = [subspaces[3]]  * 100
     darts_memory(subspaces)
 
 def from_trace(device, dir='experiment'):
-    th = 5000
+    th_list = [2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000]
     subspaces = []
-    subspace = utils.accuracy_analysis(fn = args.rollout_filename, ep = args.episodes, th)
-    subspaces.append(subspace)
-    print(subspaces)
-    darts_memory(subspaces)
+    for  ep in range(10,args.episodes+1,10):
+        
+        for th in th_list:
+            subspace = utils.accuracy_analysis(fn = args.rollout_filename, ep = ep, th = th)
+            # print((subspace, ep, th))
+            subspaces.append((subspace, ep, th))
+    # print(subspaces)
+    darts_memory_trace(subspaces)
 
 SCRIPT = {
     'darts':  from_trace,

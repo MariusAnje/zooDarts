@@ -71,7 +71,7 @@ def n_params(subspace:list, channel_size:list, linear_size:list, fm_size:list):
         ks = 0
         for w in subspace[i]:
             ks += (w*2 + 1) ** 2
-        ks = (subspace[i][-1] * 2 + 1) ** 2
+        # ks = (subspace[i][-1] * 2 + 1) ** 2
         conv_params += ks * channel_size[i] * channel_size[i+1]
     linear_params = 0
     for i in range(len(linear_size) - 1):
@@ -88,8 +88,10 @@ def stored_fm(subspace:list, channel_size:list, linear_size:list, fm_size:list):
     return conv_fm + linear_fm
 
 def memory_size(subspace:list):
-    a = 0.0000792633
-    b = 1162.9887
+    # a = 0.0000792633
+    a = 0.000082
+    # b = 1162.9887
+    b = 1362.9887
     channel_size = [3, 128, 128, 256, 256, 512, 512]
     fm_size = [32, 32, 16, 16, 8, 8]
     linear_size = [512*4*4, 1024, 10]
@@ -110,8 +112,8 @@ def get_acc_filename(fn:str):
 
 def accuracy_analysis(fn:str, ep:int, th:int=4000):
     acc_filename = get_acc_filename(fn)
-    rollouts = torch.load(fn)
-    acc = torch.load(acc_filename)
+    rollouts = torch.load(fn)[:ep]
+    acc = torch.load(acc_filename)[:ep]
     acc_sorted = np.argsort(acc)
     
     list_used = []

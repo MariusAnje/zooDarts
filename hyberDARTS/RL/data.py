@@ -31,7 +31,7 @@ def get_mnist(shuffle=True, batch_size=64, augment=False):
     return trainloader, valloader
 
 
-def get_cifar10(shuffle=True, batch_size=64, augment=False):
+def get_cifar10(shuffle=True, batch_size=64, augment=True):
     import os
     if os.name == "nt":
         dataPath = "~/testCode/data"

@@ -8,7 +8,7 @@ import copy
 import sys
 import numpy as np
 
-GETTQDM = True
+GETTQDM = False
 
 if GETTQDM:
     from tqdm import tqdm
@@ -171,7 +171,7 @@ class SuperNet(nn.Module):
         super(SuperNet, self).__init__()
         self.model = None
         self.is_super = True
-        self.HW = MixedHW(2)
+        self.HW = MixedHW(5)
     
     def get_model(self, model):
         """
@@ -261,8 +261,15 @@ class SuperNet(nn.Module):
         """
         latency = 0.0
         for name, module in self.model.named_children():
-            if isinstance(module, MixedBlock):
+            # if isinstance(module, MixedBlock):
+            if str(type(module)).find("MixedBlock") != -1:
                 latency += module.get_latency(self.HW, name)
+            if isinstance(module, nn.Sequential):
+                for sub_name, sub_m in module.named_children():
+                    if str(type(sub_m)).find("MixedBlock") != -1:
+                        latency += sub_m.get_latency(self.HW, name+"."+sub_name)
+
+        # print(f"{latency} !!!")
         return latency
     
     def get_unrolled_model_grad(self, plus:bool, net_grads_f, arch_inputs, arch_labels, criterion, eps):

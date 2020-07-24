@@ -95,9 +95,11 @@ def main(device, rollout, epochs, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Parser User Input Arguments')
-    parser.add_argument('--batchSize', action="store", type=int, default=64)
+    parser.add_argument('--batchSize', action="store", type=int, default=128)
+    parser.add_argument('--device', action="store", type=str, default="cuda:0")
     args = parser.parse_args()
-    rollout = [1,1,1,1,1,1]
+    # rollout = [1,1,1,1,1,1]
+    rollout = [1,1,0,2,2,2]
     print("Rollout:", rollout)
-    device = torch.device("cuda:0")
+    device = torch.device(args.device)
     print("Best accuracy", main(device, rollout, 60, args))
