@@ -42,3 +42,7 @@ def get_arch_loader(batch_size):
     testset_in_memory = get_set_in_memory(testset)
     archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=batch_size, shuffle=True)
     return archLoader
+
+if __name__ == "__main__":
+    trainLoader, testloader = get_normal_loader(16)
+    print(next(iter(trainLoader)))
