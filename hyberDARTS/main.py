@@ -31,10 +31,10 @@ from RL import utility
 from darts import modules
 from darts.modules import SuperNet, MixedBlock
 from darts.models import SubCIFARNet, ChildCIFARNet
+from darts import get_data
 
 import utils
 import finetune
-
 
 
 # def get_args():
@@ -281,40 +281,42 @@ def darts(subspace):
     logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
     logging.info(args.ex_info + f" method:{args.method} e{args.epochs} ep{args.episodes} test{args.train_epochs} file_{args.rollout_filename} {args.method} wsSize:{args.wsSize}" )
     
-    # Find dataset. I use both windows (desktop) and Linux (server)
-    # "nt" for dataset stored on windows machine and else for dataset stored on Linux
-    if os.name == "nt":
-        dataPath = "~/testCode/data"
-    elif os.path.expanduser("~")[-5:] == "zyan2":
-        dataPath = "~/Private/data/CIFAR10"
-    else:
-        dataPath = "/dataset/CIFAR10"
+    # # Find dataset. I use both windows (desktop) and Linux (server)
+    # # "nt" for dataset stored on windows machine and else for dataset stored on Linux
+    # if os.name == "nt":
+    #     dataPath = "~/testCode/data"
+    # elif os.path.expanduser("~")[-5:] == "zyan2":
+    #     dataPath = "~/Private/data/CIFAR10"
+    # else:
+    #     dataPath = "/dataset/CIFAR10"
     
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    # transform_train = transforms.Compose([
+    #     transforms.RandomCrop(32, padding=4),
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
-    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
-    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
-    # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
-    # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
-    # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
-    logging.debug("Caching data")
-    trainset_in_memory = []
-    for data in trainset:
-        trainset_in_memory.append(data)
-    testset_in_memory = []
-    for data in testset:
-        testset_in_memory.append(data)
+    # transform_test = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    # trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    # testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    # # Due to some interesting features of DARTS, we need two trainsets to avoid BrokenPipe Error
+    # # This trainset should be totally in memory, or to suffer a slow speed for num_workers=0
+    # # TODO: Actually DARTS uses testset here, I don't like it. This testset also needs to be in the memory anyway
+    # logging.debug("Caching data")
+    # trainset_in_memory = []
+    # for data in trainset:
+    #     trainset_in_memory.append(data)
+    # testset_in_memory = []
+    # for data in testset:
+    #     testset_in_memory.append(data)
 
-    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
-    archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+    # trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
+    # archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+    trainLoader, testloader = get_data.get_normal_loader(args.batchSize)
+    archLoader = get_data.get_arch_loader(args.batchSize)
 
     logging.debug("Creating model")
     superModel = SuperNet()
