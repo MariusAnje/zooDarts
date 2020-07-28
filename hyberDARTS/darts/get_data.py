@@ -9,7 +9,7 @@ def get_dataset():
     elif os.path.expanduser("~")[-5:] == "zyan2" or os.path.expanduser("~")[-len("zheyuyan"):] == "zheyuyan":
         dataPath = "~/Private/data/CIFAR10"
     else:
-        dataPath = "/dataset/CIFAR10"
+        dataPath = "~/Private/data/CIFAR10"
     
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),

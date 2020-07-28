@@ -38,7 +38,7 @@ def get_cifar10(shuffle=True, batch_size=64, augment=True):
     elif os.path.expanduser("~")[-5:] == "zyan2" or os.path.expanduser("~")[-len("zheyuyan"):] == "zheyuyan":
         dataPath = "~/Private/data/CIFAR10"
     else:
-        dataPath = "/dataset/CIFAR10"
+        dataPath = "~/Private/data/CIFAR10"
     normalize = Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
     # normalize = Normalize(
     #     (0.47359734773635864, 0.47359734773635864, 0.47359734773635864),
