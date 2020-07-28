@@ -56,7 +56,8 @@ class SubCIFARNet(nn.Module):
         super(SubCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
+        out_channels = [64, 64, 64, 64, 64, 64]
         in_channels = 3
 
         norm = True
@@ -69,7 +70,8 @@ class SubCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            # nn.Linear(512*4*4, 1024),
+            nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
@@ -88,7 +90,8 @@ class SubCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        # x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class ChildCIFARNet(nn.Module):
@@ -96,7 +99,9 @@ class ChildCIFARNet(nn.Module):
         super(ChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
+        out_channels = [64, 64, 64, 64, 64, 64]
+
         in_channels = 3
 
         norm = True
@@ -108,14 +113,16 @@ class ChildCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            # nn.Linear(512*4*4, 1024),
+            nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
 
     def forward(self, x):
         x = self.feature(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        # x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class OriNet(nn.Module):

@@ -35,6 +35,7 @@ from darts.models import SubCIFARNet, ChildCIFARNet, SuperCIFARNet
 import utils
 import finetune
 import subprocess
+import finetune
 
 
 
@@ -70,7 +71,7 @@ parser.add_argument(
 parser.add_argument(
     '-e', '--epochs',
     type=int,
-    default=30,
+    default=1,
     help="the total epochs for model fitting, default is 30"
     )
 parser.add_argument(
@@ -175,6 +176,8 @@ if args.no_pooling is True:
     if 'pool_size' in ARCH_SPACE:
         ARCH_SPACE.pop('pool_size')
 
+def similar(x, y):
+    return abs(x - y) < 20
 
 def parse_smi(smi_trace, gpu):
     smi_trace = smi_trace.splitlines()
@@ -185,6 +188,10 @@ def parse_smi(smi_trace, gpu):
         if index != -1:
             cleared.append(int(line[index-5:index]))
     return(cleared[gpu])
+
+def get_memory_consumption(gpu):
+    smi_trace = subprocess.check_output("nvidia-smi")
+    return(parse_smi(smi_trace, gpu))
 
 def generate_subspaces(sample_size):
     subspace_list= []
@@ -202,6 +209,23 @@ def generate_subspaces(sample_size):
         if i >= sample_size:
             break
     return subspace_list
+
+def generate_rollouts(sample_size):
+    rollout_list= []
+    full_space = [0,1,2,3]
+    i = 0
+    j = 0
+    while(True):
+        rollout = []
+        for _ in range(6):
+            rollout.append(int(np.random.choice(full_space,1,False)))
+        if not (rollout in rollout_list):
+            rollout_list.append(rollout)
+            i += 1
+        j += 1
+        if i >= sample_size:
+            break
+    return rollout_list
 
 
 def get_logger(filepath=None):
@@ -233,6 +257,10 @@ def darts_memory(subspaces, extra_info = ""):
 
     logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
     
+    gpu_list = []
+    for i in range(4):
+        if get_memory_consumption(i) < 20:
+            gpu_list.append(i)
     # Find dataset. I use both windows (desktop) and Linux (server)
     # "nt" for dataset stored on windows machine and else for dataset stored on Linux
     if os.name == "nt":
@@ -264,34 +292,44 @@ def darts_memory(subspaces, extra_info = ""):
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     archLoader  = torch.utils.data.DataLoader(testset_in_memory, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+    device = torch.device(args.device)
 
-    size_record = []
+    # for i in range(len(subspaces)):
+    for the_gpu in gpu_list:
+        size_record = []
+        i = 0
+        print(f"GPU: {the_gpu}")
+        for subspace in subspaces:
+            # logging.debug("Creating model")
+            superModel = SuperNet()
+            superModel.get_model(SubCIFARNet(subspace))
+            # superModel.get_model(SuperCIFARNet())
+            archParams = superModel.get_arch_params()
+            netParams  = superModel.get_net_params()
+            # Training optimizers
+            archOptimizer = optim.Adam(archParams,lr = 0.1)
+            netOptimizer  = optim.Adam(netParams, lr = 1e-3)
+            criterion = nn.CrossEntropyLoss()
+            torch.cuda.empty_cache()
+            # GPU or CPU
+            
+            superModel.to(device)
+            best_rollout = 0
+            # Train the super net
+            superModel.modify_super(True)
+            superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
+            # superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+            # memory_size = torch.cuda.memory_cached(device)/1024/1024
+            memory_size = get_memory_consumption(the_gpu)
+            logging.info(f"{extra_info}: {subspace}, {memory_size}")
+            size_record.append((subspace, memory_size))
+            if i == 4:
+                if (similar(size_record[1][1], size_record[2][1]) or similar(size_record[2][1], size_record[3][1])):
+                    break
+            i += 1
+        if i == len(subspaces):
+            break
 
-    for subspace in subspaces:
-        # logging.debug("Creating model")
-        superModel = SuperNet()
-        superModel.get_model(SubCIFARNet(subspace))
-        # superModel.get_model(SuperCIFARNet())
-        archParams = superModel.get_arch_params()
-        netParams  = superModel.get_net_params()
-        # Training optimizers
-        archOptimizer = optim.Adam(archParams,lr = 0.1)
-        netOptimizer  = optim.Adam(netParams, lr = 1e-3)
-        criterion = nn.CrossEntropyLoss()
-        torch.cuda.empty_cache()
-        # GPU or CPU
-        device = torch.device(args.device)
-        superModel.to(device)
-        
-
-        best_rollout = 0
-        # Train the super net
-        superModel.modify_super(True)
-        superModel.train_short(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device, 5)
-        # superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
-        memory_size = torch.cuda.memory_cached(device)/1024/1024
-        logging.info(f"{extra_info}: {subspace}, {memory_size}")
-        size_record.append((subspace, memory_size))
 
     torch.save(size_record, "dr_memory_record_new_" + time.strftime("%m%d_%H%M_%S",time.localtime()))
 
@@ -372,6 +410,73 @@ def darts_memory_trace(subspaces):
 
     # torch.save(size_record, "dr_memory_record_new_" + time.strftime("%m%d_%H%M_%S",time.localtime()))
 
+def nas(device, dir='experiment'):
+    gpu_list = []
+    for i in range(4):
+        if get_memory_consumption(i) < 20:
+            gpu_list.append(i)
+    fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
+    fileHandler.setLevel(logging.INFO)
+    streamHandler = logging.StreamHandler()
+    streamHandler.setLevel(logging.DEBUG)
+    logging.basicConfig(
+                        handlers=[
+                                    fileHandler,
+                                    streamHandler],
+                        level= logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s')
+
+    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+
+    
+    if os.name == "nt":
+        dataPath = "~/testCode/data"
+    elif os.path.expanduser("~")[-5:] == "zyan2":
+        dataPath = "~/Private/data/CIFAR10"
+    else:
+        dataPath = "/dataset/CIFAR10"
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+
+    trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
+    
+    
+    rollouts = generate_rollouts(args.size)
+    print(rollouts)
+    device = torch.device(args.device)
+    
+    for the_gpu in gpu_list:
+        rollout_record = []
+        i = 0
+        print(f"GPU: {the_gpu}")
+        for rollout in rollouts:
+            torch.cuda.empty_cache()
+            finetune.execute(rollout, trainLoader, testloader, args.epochs, device)
+            memory_size = get_memory_consumption(the_gpu)
+            logging.info(f"{rollout}, mem:{memory_size}")
+            rollout_record.append((rollout, memory_size))
+            if i == 4:
+                if (similar(rollout_record[1][1], rollout_record[2][1]) or similar(rollout_record[2][1], rollout_record[3][1])):
+                    break
+            i += 1
+        if i == len(rollouts):
+            break
+    torch.save(rollout_record, os.path.join("./experiment","rollout_mem" + time.strftime("%m%d_%H%M_%S",time.localtime())))
+
+
+    # rollout_record = torch.load("rollout_record")
+    # return rollout_record, best_samples.rollout_list[0]
+
 def memory(device, dir='experiment'):
     subspaces = generate_subspaces(args.size)
     # subspaces = [subspaces[3]]  * 100
@@ -390,8 +495,9 @@ def from_trace(device, dir='experiment'):
     darts_memory_trace(subspaces)
 
 SCRIPT = {
-    'darts':  from_trace,
-    'memory': memory
+    'darts':    from_trace,
+    'memory':   memory,
+    'nas':      nas,
     # 'nested': nested_search,
     # 'quantization': quantization_search
 }

@@ -54,6 +54,20 @@ def test(device, loader, criterion, optimizer, model):
 
     return correct/total
 
+def execute(rollout, trainLoader, testloader, epochs, device):
+    model = ChildCIFARNet(rollout)
+    model.to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    best_acc = 0
+    for _ in range(epochs):
+        train(device, trainLoader, criterion, optimizer, model)
+        acc = test(device, testloader, criterion, optimizer, model)
+        # print(acc)
+        if acc > best_acc:
+            best_acc = acc
+    return best_acc
+
 def main(device, rollout, epochs, args):
     if os.name == "nt":
         dataPath = "~/testCode/data"
@@ -71,35 +85,25 @@ def main(device, rollout, epochs, args):
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
-    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=True, transform=transform_train)
-    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=True, transform=transform_test)
+    trainset = torchvision.datasets.CIFAR10(root=dataPath, train=True, download=False, transform=transform_train)
+    testset = torchvision.datasets.CIFAR10(root=dataPath, train=False, download=False, transform=transform_test)
 
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
-    
-    model = ChildCIFARNet(rollout)
-    model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    execute(rollout, trainLoader, testloader, epochs, device)
     
     
-    best_acc = 0
-    for _ in range(epochs):
-        train(device, trainLoader, criterion, optimizer, model)
-        acc = test(device, testloader, criterion, optimizer, model)
-        # print(acc)
-        if acc > best_acc:
-            best_acc = acc
-    return best_acc
+    
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('Parser User Input Arguments')
     parser.add_argument('--batchSize', action="store", type=int, default=128)
     parser.add_argument('--device', action="store", type=str, default="cuda:0")
     args = parser.parse_args()
-    # rollout = [1,1,1,1,1,1]
-    rollout = [1,1,0,2,2,2]
+    rollout = [1,1,1,1,1,1]
+    # rollout = [3,3,3,3,3,3]
     print("Rollout:", rollout)
     device = torch.device(args.device)
     print("Best accuracy", main(device, rollout, 60, args))

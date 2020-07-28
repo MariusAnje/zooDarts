@@ -8,7 +8,7 @@ import copy
 import sys
 import numpy as np
 
-GETTQDM = False
+GETTQDM = True
 
 if GETTQDM:
     from tqdm import tqdm
@@ -151,6 +151,15 @@ class MixedBlock(nn.Module):
             for i in range(1, len(self.moduleList)):
                 output += p[i] * self.moduleList[i](x)
             return output
+        # if self.is_super:
+        #     p = self.sm(self.mix)
+        #     m = []
+        #     for i in range(0, len(self.moduleList)):
+        #         m.append(p[i] * self.moduleList[i](x))
+        #     output = m[0]
+        #     for i in range(1, len(m)):
+        #         output += m[i]
+        #     return output
         else:
             i = self.mix.argmax()
             return self.moduleList[i](x)

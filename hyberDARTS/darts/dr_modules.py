@@ -196,11 +196,13 @@ class MixedBlock(nn.Module):
         else:
             p = self.sm(self.mix)
             output = p[0] * self.moduleList[0](x)
+            size = output.size()
+            output = output.view(1,-1)
             for i in range(1, len(self.moduleList)):
                 o_item = self.moduleList[i](x)
                 # print()
-                output += p[i] * o_item
-            return output
+                output.cat((p[i] * o_item).view(1,-1))
+            return output.sum(axis = 0).view(size)
     
     def superEval(self, x):
         i = self.mix.argmax()

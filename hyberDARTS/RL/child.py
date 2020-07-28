@@ -50,7 +50,20 @@ def build_graph(input_shape, arch_paras):
     for layer_paras in arch_paras:
         sss += 1 # this line added
         cell = Cell(cell_id)
-        num_filters = layer_paras['num_filters']
+        # print(layer_paras['num_filters'])
+        # num_filters = layer_paras['num_filters'] # this line deleted
+        """
+            These lines added
+        """
+        if sss == 1 or sss == 2:
+            num_filters = 128
+        if sss == 3 or sss == 4:
+            num_filters = 256
+        if sss == 5 or sss == 6:
+            num_filters = 512
+        """
+            Ends here
+        """
         filter_height = layer_paras['filter_height']
         # filter_width = layer_paras['filter_width'] # this line deleted
         filter_width = layer_paras['filter_height']
