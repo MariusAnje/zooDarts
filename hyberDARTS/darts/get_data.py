@@ -6,7 +6,7 @@ from torchvision import transforms
 def get_dataset():
     if os.name == "nt":
         dataPath = "~/testCode/data"
-    elif os.path.expanduser("~")[-5:] == "zyan2" or os.path.expanduser("~")[-5:] == "zheyuyan":
+    elif os.path.expanduser("~")[-5:] == "zyan2" or os.path.expanduser("~")[-len("zheyuyan"):] == "zheyuyan":
         dataPath = "~/Private/data/CIFAR10"
     else:
         dataPath = "/dataset/CIFAR10"
