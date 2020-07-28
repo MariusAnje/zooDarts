@@ -35,7 +35,7 @@ def get_cifar10(shuffle=True, batch_size=64, augment=True):
     import os
     if os.name == "nt":
         dataPath = "~/testCode/data"
-    elif os.path.expanduser("~")[-5:] == "zyan2":
+    elif os.path.expanduser("~")[-5:] == "zyan2" or os.path.expanduser("~")[-len("zheyuyan"):] == "zheyuyan":
         dataPath = "~/Private/data/CIFAR10"
     else:
         dataPath = "/dataset/CIFAR10"
