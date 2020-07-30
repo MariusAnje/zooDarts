@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 # tqdm is imported for better visualization
 import tqdm
-from models import SuperCIFARNet
+from models import SuperCIFARNet, SubCIFARNet
 from modules import SuperNet, MixedBlock
 import logging
 import os
@@ -76,7 +76,9 @@ if __name__ == "__main__":
 
     logging.debug("Creating model")
     superModel = SuperNet()
-    superModel.get_model(SuperCIFARNet())
+    # superModel.get_model(SuperCIFARNet())
+    subspace = [[1,2],[0],[1,2,3],[0,2],[0,1],[1,3]]
+    superModel.get_model(SubCIFARNet(subspace))
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
     # Training optimizers

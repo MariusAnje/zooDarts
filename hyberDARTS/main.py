@@ -266,7 +266,7 @@ def nas(device, dir='experiment'):
     return rollout_record, best_samples.rollout_list[0]
     
 
-def darts(subspace):
+def darts(subspace, device):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
@@ -328,7 +328,7 @@ def darts(subspace):
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     # GPU or CPU
-    device = torch.device(args.device)
+    # device = torch.device(args.device)
     superModel.to(device)
 
     # Warm up. Well, DK if warm up is needed
@@ -365,7 +365,7 @@ def ruleAll(device, dir='experiment'):
     rl_rollout = utils.RL2DR_rollout(dr_rollout)
     subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
     print(subspace)
-    dr_rollout = darts(subspace)
+    dr_rollout = darts(subspace, device)
     print("RL best arch acc: ", finetune.main(device, rl_rollout, 60, args))
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
@@ -373,7 +373,7 @@ def darts_only(device, dir='experiment'):
     rollout_record = torch.load(args.rollout_filename)[:args.episodes]
     subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
     print(subspace)
-    dr_rollout = darts(subspace)
+    dr_rollout = darts(subspace, device)
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
 SCRIPT = {

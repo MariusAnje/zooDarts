@@ -91,7 +91,8 @@ def main(device, rollout, epochs, args):
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
-    execute(rollout, trainLoader, testloader, epochs, device)
+    best_acc = execute(rollout, trainLoader, testloader, epochs, device)
+    return best_acc
     
     
     
