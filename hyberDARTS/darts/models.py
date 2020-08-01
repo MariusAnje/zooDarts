@@ -4,7 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from modules import LayerBlock, MixedBlock
+from modules import LayerBlock, MixedBlock, QuantBlock
 
 class SuperCIFARNet(nn.Module):
     def __init__(self, num_classes = 10):
@@ -94,13 +94,61 @@ class SubCIFARNet(nn.Module):
         x = self.classifier(x.view(-1, 64*4*4))
         return x
 
+class QuantCIFARNet(nn.Module):
+    def __init__(self, subspace, num_classes = 10):
+        super(QuantCIFARNet, self).__init__()
+        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        quant_params = [{'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8},
+        {'weight_num_int_bits':1,'weight_num_frac_bits':10, 'act_num_int_bits':1, 'act_num_frac_bits':10}]
+        # modules = ["CONV1","CONV3", "CONV5"]
+        # out_channels = [128, 128, 256, 256, 512, 512]
+        out_channels = [64, 64, 64, 64, 64, 64]
+        in_channels = 3
+
+        norm = True
+        moduleList = []
+        for i in range(6):
+            submodules = self.parseSubSpace(modules, subspace[i])
+            moduleList.append(MixedBlock(self.createConvList(submodules, quant_params, in_channels, out_channels[i], norm)))
+            in_channels = out_channels[i]
+            if i in [1,3,5]:
+                moduleList.append(nn.MaxPool2d(2))
+        self.feature = nn.Sequential(*moduleList)
+        self.classifier = nn.Sequential(
+            # nn.Linear(512*4*4, 1024),
+            nn.Linear(64*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, num_classes)
+        )
+
+    def createConvList(self, modules:list, quant:list, in_channels:int, out_channels:int, norm:bool):
+        convList = []
+        for i in range(len(modules)):
+            quantList = []
+            for j in range(len(quant)):
+                quantList.append(QuantBlock(LayerBlock(modules[i], in_channels, out_channels, norm), quant[j]))
+            convList.append(MixedBlock(quantList))
+        return convList
+    
+    def parseSubSpace(self, modules, space):
+        subspace = []
+        for item in space:
+            subspace.append(modules[item])
+        return subspace
+
+    def forward(self, x):
+        x = self.feature(x)
+        # x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(-1, 64*4*4))
+        return x
+
 class ChildCIFARNet(nn.Module):
     def __init__(self, rollout, num_classes = 10):
         super(ChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        # out_channels = [128, 128, 256, 256, 512, 512]
-        out_channels = [64, 64, 64, 64, 64, 64]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [64, 64, 64, 64, 64, 64]
 
         in_channels = 3
 
@@ -165,7 +213,8 @@ class OriNet(nn.Module):
 
 if __name__ == "__main__":
     subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
-    model = SubCIFARNet(subspace)
+    model = QuantCIFARNet(subspace)
+    print(model)
     x = torch.randn(16,3,32,32)
     y = model(x).sum()
     y.backward()

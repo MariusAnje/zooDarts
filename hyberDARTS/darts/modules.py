@@ -107,6 +107,9 @@ class QuantBlock(nn.Module):
         self.quant_params = quant_params
         self.input_size = None
     
+    def extra_repr(self):
+        return f"(quant): Weight ({self.quant_params['weight_num_int_bits']}, {self.quant_params['weight_num_frac_bits']}), Act ({self.quant_params['act_num_int_bits']}, {self.quant_params['act_num_frac_bits']})"
+    
     def forward(self, x):
         if self.input_size is None:
             self.input_size = x.size()
@@ -190,7 +193,7 @@ class MixedBlock(nn.Module):
         super(MixedBlock, self).__init__()
         self.creat_modules(modules)
         self.sm = nn.Softmax(dim=-1)
-        self.is_super = True      
+        self.is_super = True
 
     def creat_modules(self, modules:list):
         self.moduleList = nn.ModuleList(modules)
@@ -607,23 +610,27 @@ class SuperNet(nn.Module):
 
         
 if __name__ == "__main__":
-    # from models import SuperCIFARNet
-    # net = SuperNet()
-    # net.get_model(SuperCIFARNet())
-    # theInput = torch.Tensor(1,3,32,32)
-    # o = net(theInput)
-    # o.sum().backward()
-    # print(net.get_arch_params())
-    # print(net.get_arch_params()[0].grad)
-    # net.modify_super(False)
-    layer = LayerBlock("CONV3", 3, 5, True)
-    quant_params = {'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8}
-    model1 = QuantBlock(layer, quant_params)
-    model2 = QuantBlock(layer, quant_params)
-    with torch.no_grad():
-        model1.op.weight /= model1.op.weight
-        print(model1.op.weight)
-        print(model2.op.weight)
+    from models import QuantCIFARNet
+    net = SuperNet()
+    subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
+    net.get_model(QuantCIFARNet(subspace))
+    print(net.model)
+    theInput = torch.Tensor(1,3,32,32)
+    o = net.model(theInput)
+    o.sum().backward()
+    print(net.get_arch_params())
+    print(net.get_arch_params()[0].grad)
+    net.modify_super(False)
+    
+    
+    # layer = LayerBlock("CONV3", 3, 5, True)
+    # quant_params = {'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8}
+    # model1 = QuantBlock(layer, quant_params)
+    # model2 = QuantBlock(layer, quant_params)
+    # with torch.no_grad():
+    #     model1.op.weight /= model1.op.weight
+    #     # print(model1.op.weight)
+    #     # print(model2.op.weight)
     # a = torch.randn(1,3,3,3)
-    # print(model(a))
-    # new
+    # print(model1(a))
+    # # new

@@ -30,7 +30,7 @@ from RL import utility
 
 from darts import modules
 from darts.modules import SuperNet, MixedBlock
-from darts.models import SubCIFARNet, ChildCIFARNet
+from darts.models import SubCIFARNet, ChildCIFARNet, QuantCIFARNet
 from darts import get_data
 
 import utils
@@ -359,7 +359,68 @@ def darts(subspace, device):
             best_rollout = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     return best_rollout
+
+def q_darts(subspace, device):
+    fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
+    fileHandler.setLevel(logging.INFO)
+    streamHandler = logging.StreamHandler()
+    streamHandler.setLevel(logging.INFO)
+    logging.basicConfig(
+                        handlers=[
+                                    fileHandler,
+                                    streamHandler],
+                        level= logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s')
+
+    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+    logging.info(args.ex_info + f" method:{args.method} e{args.epochs} ep{args.episodes} test{args.train_epochs} file_{args.rollout_filename} {args.method} wsSize:{args.wsSize}" )
     
+    trainLoader, testloader = get_data.get_normal_loader(args.batchSize)
+    archLoader = get_data.get_arch_loader(args.batchSize)
+
+    logging.debug("Creating model")
+    superModel = SuperNet()
+    superModel.get_model(QuantCIFARNet(subspace))
+    archParams = superModel.get_arch_params()
+    netParams  = superModel.get_net_params()
+    # Training optimizers
+    archOptimizer = optim.Adam(archParams,lr = 0.1)
+    netOptimizer  = optim.Adam(netParams, lr = 1e-3)
+    criterion = nn.CrossEntropyLoss()
+    # GPU or CPU
+    # device = torch.device(args.device)
+    superModel.to(device)
+
+    # Warm up. Well, DK if warm up is needed
+    # For latency, I would think of two methods. Warming only weights is one
+    # Warming also arch without latency is even more interesting
+    for i in range(0):
+        superModel.modify_super(True)
+        superModel.warm(trainLoader, netOptimizer, criterion, device)
+        logging.debug(f"           arch: {superModel.get_arch_params()}")
+
+    debug = False
+    best_acc = 0
+    best_rollout = 0
+    for i in range(args.train_epochs):
+        # Train the super net
+        superModel.modify_super(True)
+        superModel.train(trainLoader, archLoader, archOptimizer, netOptimizer, criterion, device)
+        superAcc = superModel.test(testloader, device)
+        # Test the chosen modules
+        superModel.modify_super(False)
+        acc = superModel.test(testloader, device)
+        logging.info(f"epoch {i:-3d}:  acc: {acc:.4f}, super: {superAcc:.4f}")
+        logging.info(f"           arch: {superModel.get_module_choice()}")
+        logging.debug(superModel.get_arch_params())
+        # record the best rollout
+        if acc > best_acc:
+            best_acc = acc
+            best_rollout = superModel.get_module_choice()
+        torch.save(superModel.model.state_dict(), "checkpoint.pt")
+    return best_rollout
+
+
 def ruleAll(device, dir='experiment'):
     rollout_record, dr_rollout = nas(device, dir)
     rl_rollout = utils.RL2DR_rollout(dr_rollout)
@@ -376,10 +437,18 @@ def darts_only(device, dir='experiment'):
     dr_rollout = darts(subspace, device)
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
+def quant_darts_only(device, dir='experiment'):
+    rollout_record = torch.load(args.rollout_filename)[:args.episodes]
+    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
+    print(subspace)
+    dr_rollout = q_darts(subspace, device)
+    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
+
 SCRIPT = {
     'nas': nas,
     'all': ruleAll,
     'darts': darts_only
+    'quantization': quant_darts_only
     # 'nested': nested_search,
     # 'quantization': quantization_search
 }
