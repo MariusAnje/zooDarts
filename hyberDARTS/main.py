@@ -447,7 +447,7 @@ def quant_darts_only(device, dir='experiment'):
 SCRIPT = {
     'nas': nas,
     'all': ruleAll,
-    'darts': darts_only
+    'darts': darts_only,
     'quantization': quant_darts_only
     # 'nested': nested_search,
     # 'quantization': quantization_search
