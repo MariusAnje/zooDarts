@@ -18,3 +18,4 @@ debug*
 experiment*
 *rollout_record*
 *.ipynb
+.__afs*
