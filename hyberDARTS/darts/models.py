@@ -56,8 +56,8 @@ class SubCIFARNet(nn.Module):
         super(SubCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        # out_channels = [128, 128, 256, 256, 512, 512]
-        out_channels = [64, 64, 64, 64, 64, 64]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [64, 64, 64, 64, 64, 64]
         in_channels = 3
 
         norm = True
@@ -70,8 +70,8 @@ class SubCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            # nn.Linear(512*4*4, 1024),
-            nn.Linear(64*4*4, 1024),
+            nn.Linear(512*4*4, 1024),
+            # nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
@@ -90,8 +90,8 @@ class SubCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        # x = self.classifier(x.view(-1, 512*4*4))
-        x = self.classifier(x.view(-1, 64*4*4))
+        x = self.classifier(x.view(-1, 512*4*4))
+        # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class QuantCIFARNet(nn.Module):
@@ -101,8 +101,8 @@ class QuantCIFARNet(nn.Module):
         quant_params = [{'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8},
         {'weight_num_int_bits':1,'weight_num_frac_bits':10, 'act_num_int_bits':1, 'act_num_frac_bits':10}]
         # modules = ["CONV1","CONV3", "CONV5"]
-        # out_channels = [128, 128, 256, 256, 512, 512]
-        out_channels = [64, 64, 64, 64, 64, 64]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [64, 64, 64, 64, 64, 64]
         in_channels = 3
 
         norm = True
@@ -115,8 +115,8 @@ class QuantCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            # nn.Linear(512*4*4, 1024),
-            nn.Linear(64*4*4, 1024),
+            nn.Linear(512*4*4, 1024),
+            # nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
@@ -138,8 +138,8 @@ class QuantCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        # x = self.classifier(x.view(-1, 512*4*4))
-        x = self.classifier(x.view(-1, 64*4*4))
+        x = self.classifier(x.view(-1, 512*4*4))
+        # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class ChildCIFARNet(nn.Module):
@@ -171,6 +171,37 @@ class ChildCIFARNet(nn.Module):
         x = self.feature(x)
         # x = self.classifier(x.view(-1, 512*4*4))
         x = self.classifier(x.view(-1, 64*4*4))
+        return x
+
+class QuantChildCIFARNet(nn.Module):
+    def __init__(self, rollout, quant_params, num_classes = 10):
+        super(ChildCIFARNet, self).__init__()
+        modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
+        # modules = ["CONV1","CONV3", "CONV5"]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [64, 64, 64, 64, 64, 64]
+
+        in_channels = 3
+
+        norm = True
+        moduleList = []
+        for i in range(6):
+            moduleList.append(QuantBlock(LayerBlock(modules[rollout[i]], in_channels, out_channels[i], norm), quant_params[i]))
+            in_channels = out_channels[i]
+            if i in [1,3,5]:
+                moduleList.append(nn.MaxPool2d(2))
+        self.feature = nn.Sequential(*moduleList)
+        self.classifier = nn.Sequential(
+            nn.Linear(512*4*4, 1024),
+            # nn.Linear(64*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.feature(x)
+        x = self.classifier(x.view(-1, 512*4*4))
+        # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
 class OriNet(nn.Module):
