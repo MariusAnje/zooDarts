@@ -110,6 +110,13 @@ class QuantBlock(nn.Module):
     def extra_repr(self):
         return f"(quant): Weight ({self.quant_params['weight_num_int_bits']}, {self.quant_params['weight_num_frac_bits']}), Act ({self.quant_params['act_num_int_bits']}, {self.quant_params['act_num_frac_bits']})"
     
+    def get_latency(self, HW, name):
+        """
+            get the latency of this block from HW registers
+        """
+
+        return HW.get_latency(name, self.op, self.input_size)
+    
     def forward(self, x):
         if self.input_size is None:
             self.input_size = x.size()
