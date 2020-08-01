@@ -36,6 +36,42 @@ def n_para(module:nn.Module, input_size:torch.Size):
     ks = module.kernel_size
     return ic * oc * ks[0] * ks[1] * input_size[-1] * input_size[-2]
 
+def quantize(x, num_int_bits, num_frac_bits, signed=True):
+    precision = 1 / 2 ** num_frac_bits
+    x = torch.round(x / precision) * precision
+    if signed is True:
+        bound = 2 ** (num_int_bits - 1)
+        return torch.clamp(x, -bound, bound-precision)
+    else:
+        bound = 2 ** num_int_bits
+        return torch.clamp(x, 0, bound-precision)
+
+class QuantBlock(nn.Module):
+    def __init__(self, layer:LayerBlock, quant_int, quant_frac):
+        super(QuantBlock, self).__init__()
+        self.layer = layer
+        self.quant_int = quant_int
+        self.quant_frac = quant_frac
+        self.doIt = True
+        if isinstance(self.layer.op, nn.Identity):
+            self.doIt = False
+        
+        def forward(self, x):
+        if self.doIt:
+            weight = quantize(self.layer.op.weight, quant_int, quant_frac, signed = True)
+            bias   = quantize(self.layer.op.bias,   quant_int, quant_frac, signed = True)
+            stride = self.layer.op.stride
+            x = F.conv2d(x, weight, bias, stride=stride)
+            x = quantize(
+                x,
+                quan_paras[cell.id]['act_num_int_bits'],
+                quan_paras[cell.id]['act_num_frac_bits'],
+                signed=False
+                )
+        else:
+            return self.layer(x)
+
+
 class LayerBlock(nn.Module):
     """
     A block for convolution layers with activation (ReLU) and normalization
