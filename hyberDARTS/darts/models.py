@@ -175,7 +175,7 @@ class ChildCIFARNet(nn.Module):
 
 class QuantChildCIFARNet(nn.Module):
     def __init__(self, rollout, quant_params, num_classes = 10):
-        super(ChildCIFARNet, self).__init__()
+        super(QuantChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
         out_channels = [128, 128, 256, 256, 512, 512]
