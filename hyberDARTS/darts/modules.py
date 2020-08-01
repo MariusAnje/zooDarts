@@ -8,7 +8,7 @@ import copy
 import sys
 import numpy as np
 
-GETTQDM = False
+GETTQDM = True
 
 if GETTQDM:
     from tqdm import tqdm
