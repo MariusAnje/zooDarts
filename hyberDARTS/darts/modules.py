@@ -8,7 +8,7 @@ import copy
 import sys
 import numpy as np
 
-GETTQDM = True
+GETTQDM = False
 
 if GETTQDM:
     from tqdm import tqdm
@@ -35,6 +35,16 @@ def n_para(module:nn.Module, input_size:torch.Size):
     oc = module.out_channels
     ks = module.kernel_size
     return ic * oc * ks[0] * ks[1] * input_size[-1] * input_size[-2]
+
+def quantize(x, num_int_bits, num_frac_bits, signed=True):
+    precision = 1 / 2 ** num_frac_bits
+    x = torch.round(x / precision) * precision
+    if signed is True:
+        bound = 2 ** (num_int_bits - 1)
+        return torch.clamp(x, -bound, bound-precision)
+    else:
+        bound = 2 ** num_int_bits
+        return torch.clamp(x, 0, bound-precision)
 
 class LayerBlock(nn.Module):
     """
@@ -84,6 +94,51 @@ class LayerBlock(nn.Module):
         if self.input_size is None:
             self.input_size = x.size()
         return self.norm(self.act(self.op(x)))
+
+class QuantBlock(nn.Module):
+    """
+    QuantBlock
+    """
+    def __init__(self, layer:LayerBlock, quant_params):
+        super(QuantBlock, self).__init__()
+        self.op = copy.deepcopy(layer.op)
+        self.act = copy.deepcopy(layer.act)
+        self.norm = copy.deepcopy(layer.norm)
+        self.quant_params = quant_params
+        self.input_size = None
+    
+    def forward(self, x):
+        if self.input_size is None:
+            self.input_size = x.size()
+        if isinstance(self.op, nn.Conv2d):
+            op = self.op
+            weight, bias, stride, padding, dilation, groups = \
+                op.weight, op.bias, op.stride, op.padding, op.dilation, op.groups
+            weight = quantize(
+                        weight,
+                        self.quant_params['weight_num_int_bits'],
+                        self.quant_params['weight_num_frac_bits'],
+                        signed=True)
+            bias = quantize(
+                        bias,
+                        self.quant_params['weight_num_int_bits'],
+                        self.quant_params['weight_num_frac_bits'],
+                        signed=True)
+
+            x = F.conv2d(x, weight, bias, stride, padding, dilation, groups)
+            x = self.act(x)
+            x = quantize(
+                x,
+                self.quant_params['act_num_int_bits'],
+                self.quant_params['act_num_frac_bits'],
+                signed=False
+                )
+            x = self.norm(x)
+            return x
+        else:
+            return self.norm(self.act(self.op(x)))
+
+
 
 class MixedHW(nn.Module):
     """
@@ -552,12 +607,22 @@ class SuperNet(nn.Module):
 
         
 if __name__ == "__main__":
-    from models import SuperCIFARNet
-    net = SuperNet()
-    net.get_model(SuperCIFARNet())
-    theInput = torch.Tensor(1,3,32,32)
-    o = net(theInput)
-    o.sum().backward()
-    print(net.get_arch_params())
-    print(net.get_arch_params()[0].grad)
-    net.modify_super(False)
+    # from models import SuperCIFARNet
+    # net = SuperNet()
+    # net.get_model(SuperCIFARNet())
+    # theInput = torch.Tensor(1,3,32,32)
+    # o = net(theInput)
+    # o.sum().backward()
+    # print(net.get_arch_params())
+    # print(net.get_arch_params()[0].grad)
+    # net.modify_super(False)
+    layer = LayerBlock("CONV3", 3, 5, True)
+    quant_params = {'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8}
+    model1 = QuantBlock(layer, quant_params)
+    model2 = QuantBlock(layer, quant_params)
+    with torch.no_grad():
+        model1.op.weight /= model1.op.weight
+        print(model1.op.weight)
+        print(model2.op.weight)
+    # a = torch.randn(1,3,3,3)
+    # print(model(a))
