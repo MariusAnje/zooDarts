@@ -98,8 +98,8 @@ class QuantCIFARNet(nn.Module):
     def __init__(self, subspace, num_classes = 10):
         super(QuantCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        quant_params = [{'weight_num_int_bits':3,'weight_num_frac_bits':8, 'act_num_int_bits':3, 'act_num_frac_bits':8},
-        {'weight_num_int_bits':1,'weight_num_frac_bits':10, 'act_num_int_bits':1, 'act_num_frac_bits':10}]
+        quant_params = [{'weight_num_int_bits':8,'weight_num_frac_bits':8, 'act_num_int_bits':8, 'act_num_frac_bits':8},
+        {'weight_num_int_bits':7,'weight_num_frac_bits':9, 'act_num_int_bits':7, 'act_num_frac_bits':9}]
         # modules = ["CONV1","CONV3", "CONV5"]
         out_channels = [128, 128, 256, 256, 512, 512]
         # out_channels = [64, 64, 64, 64, 64, 64]
