@@ -10,12 +10,25 @@ ARCH_SPACE = {
     # "pool_size": (1, 2)  # this line deleted
     }
 
+"""
+>>>>>>>>>>>>These line deleted
+# QUAN_SPACE = {
+#     "act_num_int_bits": (0, 1, 2, 3),
+#     "act_num_frac_bits": (0, 1, 2, 3, 4, 5, 6),
+#     "weight_num_int_bits": (0, 1, 2, 3,),
+#     "weight_num_frac_bits": (0, 1, 2, 3, 4, 5, 6)
+#     }
+>>>>>>>>>>>>Ends here
+"""
+
+# >>>>>>>>>>These lines added
 QUAN_SPACE = {
-    "act_num_int_bits": (0, 1, 2, 3),
-    "act_num_frac_bits": (0, 1, 2, 3, 4, 5, 6),
-    "weight_num_int_bits": (0, 1, 2, 3,),
-    "weight_num_frac_bits": (0, 1, 2, 3, 4, 5, 6)
+    "act_num_int_bits": (1, 3),
+    "act_num_frac_bits": (1, 3, 6),
+    "weight_num_int_bits": (1, 3),
+    "weight_num_frac_bits": (1, 3, 6),
     }
+# >>>>>>>>>>Ends here
 
 CLOCK_FREQUENCY = 100e6
 

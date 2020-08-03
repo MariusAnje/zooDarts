@@ -46,6 +46,40 @@ def quantize(x, num_int_bits, num_frac_bits, signed=True):
         bound = 2 ** num_int_bits
         return torch.clamp(x, 0, bound-precision)
 
+class QuantValue(nn.Module):
+    """
+    Quantization
+    """
+    def __init__(self, N, m):
+        super(QuantValue, self).__init__()
+        self.N = N
+        self.m = m
+        self.quant = QuantValue_F.apply
+
+    def forward(self, x):
+        return self.quant(x, self.N, self.m)
+    
+    def extra_repr(self):
+        s = ('N = %d, m = %d'%(self.N, self.m))
+        return s
+
+class QuantValue_F(torch.autograd.Function):
+    """
+    res = clamp(round(input/pow(2,-m)) * pow(2, -m), -pow(2, N-1), pow(2, N-1) - 1)
+    """
+
+    @staticmethod 
+    def forward(ctx, inputs, N, m):
+        Q = pow(2, N - 1) - 1
+        delt = pow(2, - m)
+        M = (inputs.to(torch.float32)/delt).round().clamp(-Q-1,Q)
+        return delt*M
+    
+    @staticmethod
+    def backward(ctx, g):
+        return g , None, None
+
+
 class LayerBlock(nn.Module):
     """
     A block for convolution layers with activation (ReLU) and normalization
@@ -101,6 +135,8 @@ class QuantBlock(nn.Module):
     """
     def __init__(self, layer:LayerBlock, quant_params):
         super(QuantBlock, self).__init__()
+        self.quant_weight = QuantValue(quant_params['weight_num_int_bits'] + quant_params['weight_num_frac_bits'], quant_params['weight_num_frac_bits'])
+        self.quant_act    = QuantValue(quant_params['act_num_int_bits']    + quant_params['act_num_frac_bits'],    quant_params['act_num_frac_bits'])
         self.op = copy.deepcopy(layer.op)
         self.act = copy.deepcopy(layer.act)
         self.norm = copy.deepcopy(layer.norm)
@@ -124,25 +160,28 @@ class QuantBlock(nn.Module):
             op = self.op
             weight, bias, stride, padding, dilation, groups = \
                 op.weight, op.bias, op.stride, op.padding, op.dilation, op.groups
-            weight = quantize(
-                        weight,
-                        self.quant_params['weight_num_int_bits'],
-                        self.quant_params['weight_num_frac_bits'],
-                        signed=True)
-            bias = quantize(
-                        bias,
-                        self.quant_params['weight_num_int_bits'],
-                        self.quant_params['weight_num_frac_bits'],
-                        signed=True)
+            # weight = quantize(
+            #             weight,
+            #             self.quant_params['weight_num_int_bits'],
+            #             self.quant_params['weight_num_frac_bits'],
+            #             signed=True)
+            # bias = quantize(
+            #             bias,
+            #             self.quant_params['weight_num_int_bits'],
+            #             self.quant_params['weight_num_frac_bits'],
+            #             signed=True)
+            weight = self.quant_weight(weight)
+            bias   = self.quant_weight(bias)
 
             x = F.conv2d(x, weight, bias, stride, padding, dilation, groups)
             x = self.act(x)
-            x = quantize(
-                x,
-                self.quant_params['act_num_int_bits'],
-                self.quant_params['act_num_frac_bits'],
-                signed=False
-                )
+            # x = quantize(
+            #     x,
+            #     self.quant_params['act_num_int_bits'],
+            #     self.quant_params['act_num_frac_bits'],
+            #     signed=False
+            #     )
+            x = self.quant_act(x)
             x = self.norm(x)
             return x
         else:

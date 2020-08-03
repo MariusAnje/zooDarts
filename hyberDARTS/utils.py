@@ -2,18 +2,33 @@ import numpy as np
 import torch
 import copy
 
-def space_recognition(record):
-    usefulList = [0, 4, 8, 12, 16, 20]
-    usefulRecord = []
-    for j in usefulList:
-        recordItem = []
-        for i in range(len(record)):
-            recordItem.append(record[i][j])
-        usefulRecord.append(recordItem)
-    return usefulRecord
+def space_recognition(record, quant):
+    if quant:
+        usefulList = [0, 8, 16, 24, 32, 40]
+        newList = []
+        for i in usefulList:
+            newList.append(i)
+            newList += list(range(i+4,i+8))
+        usefulList = newList
+        usefulRecord = []
+        for j in usefulList:
+            recordItem = []
+            for i in range(len(record)):
+                recordItem.append(record[i][j])
+            usefulRecord.append(recordItem)
+        return usefulRecord
+    else:
+        usefulList = [0, 4, 8, 12, 16, 20]
+        usefulRecord = []
+        for j in usefulList:
+            recordItem = []
+            for i in range(len(record)):
+                recordItem.append(record[i][j])
+            usefulRecord.append(recordItem)
+        return usefulRecord
 
-def working_set(record, size):
-    space = space_recognition(record)
+def working_set(record, size, quant):
+    space = space_recognition(record, quant)
     WS = []
     WSSize = []
     for i in range(len(space)):
@@ -47,23 +62,32 @@ def min_working_set(WS, WSSize, find_type):
                 for k in range(len(WS[i][j])):
                     size[j] += (WS[i][j][k] * 2 + 1) **2
         index = size.argmin()
-    print(size)
+    # print(size)
     subspace = []
     for item in WS:
         subspace.append(item[index])
     return subspace
 
-def min_subspace(record, size, find_type = "mult"):
-    WS, WSSize = working_set(record, size)
+def min_subspace(record, size, find_type = "mult", quant = False):
+    WS, WSSize = working_set(record, size, quant)
     subspace = min_working_set(WS, WSSize, find_type)
     return subspace
 
-def RL2DR_rollout(rl_rollout):
-    usefulList = [0, 4, 8, 12, 16, 20]
-    dr_rollout = []
-    for i in usefulList:
-        dr_rollout.append(rl_rollout[i])
-    return dr_rollout
+def RL2DR_rollout(rl_rollout, quant = False):
+    if quant:
+        usefulList = [0, 8, 16, 24, 32, 40]
+        dr_rollout = []
+        for i in usefulList:
+            dr_rollout.append(rl_rollout[i])
+            dr_rollout += rl_rollout[i+4:i+8]
+        return dr_rollout
+    else:
+        usefulList = [0, 4, 8, 12, 16, 20]
+        dr_rollout = []
+        for i in usefulList:
+            dr_rollout.append(rl_rollout[i])
+        return dr_rollout
+        
 
 def n_params(subspace:list, channel_size:list, linear_size:list, fm_size:list):
     conv_params = 0
@@ -81,7 +105,7 @@ def n_params(subspace:list, channel_size:list, linear_size:list, fm_size:list):
 def stored_fm(subspace:list, channel_size:list, linear_size:list, fm_size:list):
     conv_fm = 0
     for i in range(len(subspace)):
-        conv_fm += fm_size[i] * fm_size[i] * channel_size[i] * channel_size[i+1] * len(subspace[i])
+        conv_fm += fm_size[i] * fm_size[i] * channel_size[i+1] * len(subspace[i])
     linear_fm = 0
     for i in range(len(linear_size) - 1):
         linear_fm += linear_size[i+1]
@@ -135,9 +159,20 @@ def accuracy_analysis(fn:str, ep:int, th:int=4000):
     return final_subspace
 
 if __name__ == "__main__":
-    import torch
-    record = torch.load("rollout_record")
-    record = record * 10
-    subspace = min_subspace(record, 9)
+    # import torch
+    # record = torch.load("rollout_record")
+    # record = record * 10
+    # subspace = min_subspace(record, 9)
+    # print(subspace)
+    q_rollouts = [
+        [3, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 2, 1, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 1, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 2],
+        [2, 0, 0, 0, 1, 0, 1, 2, 0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 3, 0, 0, 0, 1, 2, 0, 2, 2, 0, 0, 0, 0, 1, 1, 2],
+        [3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 0, 1, 1, 0, 0, 0, 1, 2, 0, 2, 3, 0, 0, 0, 1, 0, 1, 2, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0],
+        [2, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 0, 3, 0, 0, 0, 0, 2, 1, 1, 2, 0, 0, 0, 0, 0, 1, 1, 3, 0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 0, 0, 0, 2]
+    ]
+    print(RL2DR_rollout(q_rollouts[0], quant=True))
+    print(len(RL2DR_rollout(q_rollouts[0], quant=True)))
+    subspace = min_subspace(q_rollouts, 3, quant = True)
     print(subspace)
+    print(len(subspace))
 
