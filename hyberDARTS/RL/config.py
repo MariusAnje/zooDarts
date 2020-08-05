@@ -24,9 +24,9 @@ ARCH_SPACE = {
 # >>>>>>>>>>These lines added
 QUAN_SPACE = {
     "act_num_int_bits": (1, 3),
-    "act_num_frac_bits": (1, 3, 6),
+    "act_num_frac_bits": (3, 6),
     "weight_num_int_bits": (1, 3),
-    "weight_num_frac_bits": (1, 3, 6),
+    "weight_num_frac_bits": (3, 6),
     }
 # >>>>>>>>>>Ends here
 

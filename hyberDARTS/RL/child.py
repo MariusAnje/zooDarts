@@ -210,25 +210,37 @@ class CNN(nn.Module):
             drop = getattr(self, 'drop_{}'.format(cell.id))
             if quan_paras is not None:
                 weight, bias = conv.weight, conv.bias
-                weight = quantize(
-                            weight,
-                            quan_paras[cell.id]['weight_num_int_bits'],
-                            quan_paras[cell.id]['weight_num_frac_bits'],
-                            signed=True)
-                bias = quantize(
-                        bias,
-                        quan_paras[cell.id]['weight_num_int_bits'],
-                        quan_paras[cell.id]['weight_num_frac_bits'],
-                        signed=True
-                        )
+                # weight = quantize(
+                #             weight,
+                #             quan_paras[cell.id]['weight_num_int_bits'],
+                #             quan_paras[cell.id]['weight_num_frac_bits'],
+                #             signed=True)
+                weight_f = QuantValue_F.apply(
+                    weight,
+                    quan_paras[cell.id]['weight_num_int_bits'] + quan_paras[cell.id]['weight_num_frac_bits'], 
+                    quan_paras[cell.id]['weight_num_frac_bits'])
+                # bias = quantize(
+                #         bias,
+                #         quan_paras[cell.id]['weight_num_int_bits'],
+                #         quan_paras[cell.id]['weight_num_frac_bits'],
+                #         signed=True
+                #         )
+                bias_f = QuantValue_F.apply(
+                    bias,
+                    quan_paras[cell.id]['weight_num_int_bits'] + quan_paras[cell.id]['weight_num_frac_bits'], 
+                    quan_paras[cell.id]['weight_num_frac_bits'])
                 stride = conv.stride
-                x = F.conv2d(x, weight, bias, stride=stride)
-                x = quantize(
+                x = F.conv2d(x, weight_f, bias_f, stride=stride)
+                # x = quantize(
+                #     x,
+                #     quan_paras[cell.id]['act_num_int_bits'],
+                #     quan_paras[cell.id]['act_num_frac_bits'],
+                #     signed=False
+                #     )
+                x = QuantValue_F.apply(
                     x,
-                    quan_paras[cell.id]['act_num_int_bits'],
-                    quan_paras[cell.id]['act_num_frac_bits'],
-                    signed=False
-                    )
+                    quan_paras[cell.id]['act_num_int_bits'] + quan_paras[cell.id]['act_num_frac_bits'], 
+                    quan_paras[cell.id]['act_num_frac_bits'])
             else:
                 x = conv(x)
             x = F.relu(x)
@@ -267,6 +279,39 @@ def quantize(x, num_int_bits, num_frac_bits, signed=True):
     else:
         bound = 2 ** num_int_bits
         return torch.clamp(x, 0, bound-precision)
+
+class QuantValue(nn.Module):
+    """
+    Quantization
+    """
+    def __init__(self, N, m):
+        super(QuantValue, self).__init__()
+        self.N = N
+        self.m = m
+        self.quant = QuantValue_F.apply
+
+    def forward(self, x):
+        return self.quant(x, self.N, self.m)
+    
+    def extra_repr(self):
+        s = ('N = %d, m = %d'%(self.N, self.m))
+        return s
+
+class QuantValue_F(torch.autograd.Function):
+    """
+    res = clamp(round(input/pow(2,-m)) * pow(2, -m), -pow(2, N-1), pow(2, N-1) - 1)
+    """
+
+    @staticmethod 
+    def forward(ctx, inputs, N, m):
+        Q = pow(2, N - 1) - 1
+        delt = pow(2, - m)
+        M = (inputs.to(torch.float32)/delt).round().clamp(-Q-1,Q)
+        return delt*M
+    
+    @staticmethod
+    def backward(ctx, g):
+        return g , None, None
 
 
 def get_model(input_shape, paras, num_classes, device=torch.device('cpu'),

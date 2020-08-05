@@ -447,7 +447,7 @@ def darts(subspace, device):
         # record the best rollout
         if acc > best_acc:
             best_acc = acc
-            best_rollout = superModel.get_module_choice()
+            best_rollout, choice_names = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     return best_rollout
 
@@ -471,11 +471,15 @@ def q_darts(subspace, device):
 
     logging.debug("Creating model")
     superModel = SuperNet()
+    # >>>> badthing here
+    subspace = [[2, 3], [0, 1], [2], [1], [2],      [1], [0, 1], [2], [0, 1], [2],      [1, 3], [0, 1], [2], [1], [1, 2],      [2], [0, 1], [1], [1], [2],      [2], [0, 1], [2], [0, 1], [ 2],      [1, 2], [0], [1, 2], [1], [2]]
+    # >>>> end of badthing
     superModel.get_model(QuantCIFARNet(subspace))
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
     # Training optimizers
     archOptimizer = optim.Adam(archParams,lr = 0.1)
+    # netOptimizer  = optim.SGD(netParams, lr = 1e-4, momentum=0.9)
     netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     # GPU or CPU
@@ -507,7 +511,7 @@ def q_darts(subspace, device):
         # record the best rollout
         if acc > best_acc:
             best_acc = acc
-            best_rollout = superModel.get_module_choice()
+            best_rollout, choice_names = superModel.get_module_choice()
         torch.save(superModel.model.state_dict(), "checkpoint.pt")
     return best_rollout
 
@@ -533,7 +537,7 @@ def quant_darts_only(device, dir='experiment'):
     subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
     print(subspace)
     dr_rollout = q_darts(subspace, device)
-    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
+    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args, quant = True))
 
 SCRIPT = {
     'nas': nas,

@@ -143,8 +143,8 @@ class QuantBlock(nn.Module):
         self.quant_params = quant_params
         self.input_size = None
     
-    def extra_repr(self):
-        return f"(quant): Weight ({self.quant_params['weight_num_int_bits']}, {self.quant_params['weight_num_frac_bits']}), Act ({self.quant_params['act_num_int_bits']}, {self.quant_params['act_num_frac_bits']})"
+    # def extra_repr(self):
+    #     return f"(quant): Weight ({self.quant_params['weight_num_int_bits']}, {self.quant_params['weight_num_frac_bits']}), Act ({self.quant_params['act_num_int_bits']}, {self.quant_params['act_num_frac_bits']})"
     
     def get_latency(self, HW, name):
         """
@@ -298,17 +298,22 @@ class SuperNet(nn.Module):
         """
         self.model.load_state_dict(state_dict)
     
-    def get_arch_params(self):
+    def get_arch_params(self, get_name = False):
         """
             get probabilities (logits) for architecture
             returns a list of tensors
         """
         arch_params = []
+        arch_names  = []
         for name, para in self.model.named_parameters():
             if name.find(".mix") != -1:
                 arch_params.append(para)
+                arch_names.append(name)
         arch_params.append(self.HW.mix)
-        return arch_params
+        if get_name:
+            return arch_params, arch_names
+        else:
+            return arch_params
     
     def get_module_choice(self):
         """
@@ -319,10 +324,10 @@ class SuperNet(nn.Module):
         # for name, module in self.model.named_modules():
         #     if isinstance(module, MixedBlock):
         #         module_choice.append((name, module.mix.argmax().item()))
-        arch_params = self.get_arch_params()
+        arch_params, arch_names = self.get_arch_params(get_name=True)
         for item in arch_params:
             module_choice.append(item.argmax().item())
-        return module_choice
+        return module_choice, arch_names
     
     def get_net_params(self):
         """
@@ -352,7 +357,7 @@ class SuperNet(nn.Module):
             returns a scaler
         """
         alpha = 0.1
-        beta = 0.5
+        beta = 0
         # print(self.get_latency())
         # print(self.get_latency().log())
         # exit()

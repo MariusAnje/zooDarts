@@ -18,7 +18,7 @@ import sys
 sys.path.append('./darts')
 sys.path.append('./RL')
 
-from darts.models import ChildCIFARNet
+from darts.models import ChildCIFARNet, QuantChildCIFARNet
 
 def train(device, loader, criterion, optimizer, model):
     model.train()
@@ -54,8 +54,11 @@ def test(device, loader, criterion, optimizer, model):
 
     return correct/total
 
-def execute(rollout, trainLoader, testloader, epochs, device):
-    model = ChildCIFARNet(rollout)
+def execute(rollout, trainLoader, testloader, epochs, device, quant):
+    if quant:
+        model = QuantChildCIFARNet(rollout)
+    else:
+        model = ChildCIFARNet(rollout)
     model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -68,7 +71,7 @@ def execute(rollout, trainLoader, testloader, epochs, device):
             best_acc = acc
     return best_acc
 
-def main(device, rollout, epochs, args):
+def main(device, rollout, epochs, args, quant = False):
     if os.name == "nt":
         dataPath = "~/testCode/data"
     elif os.path.expanduser("~")[-5:] == "zyan2":
@@ -91,7 +94,7 @@ def main(device, rollout, epochs, args):
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
-    best_acc = execute(rollout, trainLoader, testloader, epochs, device)
+    best_acc = execute(rollout, trainLoader, testloader, epochs, device, quant)
     return best_acc
     
     
@@ -105,6 +108,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     rollout = [1,1,1,1,1,1]
     # rollout = [3,3,3,3,3,3]
+    subspace = [[2, 3], [0, 1], [2], [1], [2],      [1], [0, 1], [2], [0, 1], [2],      [1, 3], [0, 1], [2], [1], [1, 2],      [2], [0, 1], [1], [1], [2],      [2], [0, 1], [2], [0, 1], [ 2],      [1, 2], [0], [1, 2], [1], [2]]
+    # rollout = [0, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 2, 1, 2, 0, 0, 1, 1, 2, 0, 1, 2, 1, 2, 1, 0, 1, 1, 2]
+    # rollout = [1, 0, 2, 1, 2, 0, 1, 2, 0, 2, 1, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2]
+    # rollout = [0, 1, 2, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 0, 2, 0, 0, 1, 1, 2]
+    rollout = [1, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 1, 2, 1, 2, 0, 1, 1, 1, 2, 0, 0, 2, 1, 2, 1, 0, 2, 1, 2]
     print("Rollout:", rollout)
     device = torch.device(args.device)
-    print("Best accuracy", main(device, rollout, 60, args))
+    print("Best accuracy", main(device, rollout, 60, args, True))

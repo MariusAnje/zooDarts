@@ -98,18 +98,17 @@ class QuantCIFARNet(nn.Module):
     def __init__(self, subspace, num_classes = 10):
         super(QuantCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        quant_params = [{'weight_num_int_bits':8,'weight_num_frac_bits':8, 'act_num_int_bits':8, 'act_num_frac_bits':8},
-        {'weight_num_int_bits':7,'weight_num_frac_bits':9, 'act_num_int_bits':7, 'act_num_frac_bits':9}]
-        # modules = ["CONV1","CONV3", "CONV5"]
-        out_channels = [128, 128, 256, 256, 512, 512]
-        # out_channels = [64, 64, 64, 64, 64, 64]
-        in_channels = 3
 
+        # quant_params = [{'weight_num_int_bits':8,'weight_num_frac_bits':8, 'act_num_int_bits':8, 'act_num_frac_bits':8},
+        # {'weight_num_int_bits':7,'weight_num_frac_bits':9, 'act_num_int_bits':7, 'act_num_frac_bits':9}]
+        out_channels = [128, 128, 256, 256, 512, 512]
+        in_channels = 3
+        arch_params, quant_params = self.getParams(subspace)
         norm = True
         moduleList = []
         for i in range(6):
-            submodules = self.parseSubSpace(modules, subspace[i])
-            moduleList.append(MixedBlock(self.createConvList(submodules, quant_params, in_channels, out_channels[i], norm)))
+            submodules = self.parseSubSpace(modules, arch_params[i])
+            moduleList.append(MixedBlock(self.createConvList(submodules, quant_params[i], in_channels, out_channels[i], norm)))
             in_channels = out_channels[i]
             if i in [1,3,5]:
                 moduleList.append(nn.MaxPool2d(2))
@@ -130,6 +129,34 @@ class QuantCIFARNet(nn.Module):
             convList.append(MixedBlock(quantList))
         return convList
     
+    def getParams(self, subspace):
+        num_layers = len(subspace)//5
+        int_choice =  (1,3)
+        frac_choice = (1,3,6)
+        arch_params = []
+        quant_params = []
+        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+        for i in range(num_layers):
+            start = i * 5
+            arch_params.append(subspace[start])
+            w_i_s = subspace[start + 1]
+            w_f_s = subspace[start + 2]
+            a_i_s = subspace[start + 3]
+            a_f_s = subspace[start + 4]
+            layer_quant_params = []
+            for wi in range(len(w_i_s)):
+                for wf in range(len(w_f_s)):
+                    for ai in range(len(a_i_s)):
+                        for af in range(len(a_f_s)):
+                            new_quant = {}
+                            new_quant[quant_keys[0]] = int_choice[w_i_s[wi]]
+                            new_quant[quant_keys[1]] = frac_choice[w_f_s[wf]]
+                            new_quant[quant_keys[2]] = int_choice[a_i_s[ai]]
+                            new_quant[quant_keys[3]] = frac_choice[a_f_s[af]]
+                            layer_quant_params.append(new_quant)
+            quant_params.append(layer_quant_params)
+        return arch_params, quant_params
+
     def parseSubSpace(self, modules, space):
         subspace = []
         for item in space:
@@ -174,10 +201,28 @@ class ChildCIFARNet(nn.Module):
         return x
 
 class QuantChildCIFARNet(nn.Module):
-    def __init__(self, rollout, quant_params, num_classes = 10):
+    def __init__(self, rollout, num_classes = 10):
         super(QuantChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
-        # modules = ["CONV1","CONV3", "CONV5"]
+        num_layers = len(rollout)//5
+        int_choice =  (1,3)
+        frac_choice = (1,3,6)
+        arch_params = []
+        quant_params = []
+        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+        for i in range(num_layers):
+            start = i * 5
+            arch_params.append(rollout[start])
+            w_i_s = rollout[start + 1]
+            w_f_s = rollout[start + 2]
+            a_i_s = rollout[start + 3]
+            a_f_s = rollout[start + 4]
+            new_quant = {}
+            new_quant[quant_keys[0]] = int_choice[w_i_s]
+            new_quant[quant_keys[1]] = frac_choice[w_f_s]
+            new_quant[quant_keys[2]] = int_choice[a_i_s]
+            new_quant[quant_keys[3]] = frac_choice[a_f_s]
+            quant_params.append(new_quant)
         out_channels = [128, 128, 256, 256, 512, 512]
         # out_channels = [64, 64, 64, 64, 64, 64]
 
@@ -186,7 +231,7 @@ class QuantChildCIFARNet(nn.Module):
         norm = True
         moduleList = []
         for i in range(6):
-            moduleList.append(QuantBlock(LayerBlock(modules[rollout[i]], in_channels, out_channels[i], norm), quant_params[i]))
+            moduleList.append(QuantBlock(LayerBlock(modules[arch_params[i]], in_channels, out_channels[i], norm), quant_params[i]))
             in_channels = out_channels[i]
             if i in [1,3,5]:
                 moduleList.append(nn.MaxPool2d(2))
@@ -243,8 +288,11 @@ class OriNet(nn.Module):
         return x
 
 if __name__ == "__main__":
-    subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
-    model = QuantCIFARNet(subspace)
+    # subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
+    # model = QuantCIFARNet(subspace)
+    # print(model)
+    rollout = [1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,]
+    model = QuantChildCIFARNet(rollout)
     print(model)
     x = torch.randn(16,3,32,32)
     y = model(x).sum()
