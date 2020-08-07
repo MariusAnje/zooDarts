@@ -397,6 +397,7 @@ class SuperNet(nn.Module):
             returns a set of gradients
         """
         unrolled_model = copy.deepcopy(self.model)
+        unrolled_model.eval()
         if plus:
             signer = 1
         else:
@@ -432,6 +433,7 @@ class SuperNet(nn.Module):
         arch_optimizer.zero_grad()
         arch_inputs, arch_labels = arch_data
         arch_inputs, arch_labels = arch_inputs.to(device), arch_labels.to(device)
+        self.model.eval()
         arch_outputs = self.model(arch_inputs)
         arch_loss = self.get_arch_loss(criterion, arch_outputs, arch_labels)
         arch_loss.backward()
@@ -476,6 +478,7 @@ class SuperNet(nn.Module):
         # arch_loader = iter(arch_loader)
         with tqdm(net_loader) as run_loader:
             for inputs, labels in run_loader:
+                self.model.train()
                 inputs, labels = inputs.to(device), labels.to(device)
                 net_optimizer.zero_grad()
                 arch_optimizer.zero_grad()

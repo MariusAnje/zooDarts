@@ -455,7 +455,7 @@ def q_darts(subspace, device):
     fileHandler = logging.FileHandler(args.log_filename + time.strftime("%m%d_%H%M_%S",time.localtime()), mode = "a+")
     fileHandler.setLevel(logging.INFO)
     streamHandler = logging.StreamHandler()
-    streamHandler.setLevel(logging.INFO)
+    streamHandler.setLevel(logging.DEBUG)
     logging.basicConfig(
                         handlers=[
                                     fileHandler,
@@ -472,15 +472,15 @@ def q_darts(subspace, device):
     logging.debug("Creating model")
     superModel = SuperNet()
     # >>>> badthing here
-    subspace = [[2, 3], [0, 1], [2], [1], [2],      [1], [0, 1], [2], [0, 1], [2],      [1, 3], [0, 1], [2], [1], [1, 2],      [2], [0, 1], [1], [1], [2],      [2], [0, 1], [2], [0, 1], [ 2],      [1, 2], [0], [1, 2], [1], [2]]
+    subspace = [[1,2], [1], [1,1,1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [2], [1], [2],      [1,2], [1], [2], [1], [ 2],      [1,2], [1], [2], [1], [2]]
     # >>>> end of badthing
     superModel.get_model(QuantCIFARNet(subspace))
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
     # Training optimizers
     archOptimizer = optim.Adam(archParams,lr = 0.1)
-    # netOptimizer  = optim.SGD(netParams, lr = 1e-4, momentum=0.9)
-    netOptimizer  = optim.Adam(netParams, lr = 1e-3)
+    netOptimizer  = optim.SGD(netParams, lr = 1e-4, momentum=0.9)
+    # netOptimizer  = optim.Adam(netParams, lr = 1e-3)
     criterion = nn.CrossEntropyLoss()
     # GPU or CPU
     # device = torch.device(args.device)
