@@ -471,10 +471,7 @@ def q_darts(subspace, device):
 
     logging.debug("Creating model")
     superModel = SuperNet()
-    # >>>> badthing here
-    # subspace = [[1,2], [1], [1,1,1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [2], [1], [2],      [1,2], [1], [2], [1], [ 2],      [1,2], [1], [2], [1], [2]]
-    subspace = [[2, 3], [0, 1], [1], [1], [1], [0, 1], [1], [0, 1], [0, 1], [1], [0, 1], [0], [1], [0, 1], [1], [3], [1], [0, 1], [0, 1], [1], [1, 2, 3], [0, 1], [1], [0, 1], [1], [0, 1], [0, 1], [0, 1], [0, 1], [1]]
-    # >>>> end of badthing
+    
     superModel.get_model(QuantCIFARNet(subspace))
     archParams = superModel.get_arch_params()
     netParams  = superModel.get_net_params()
@@ -534,9 +531,13 @@ def darts_only(device, dir='experiment'):
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args))
 
 def quant_darts_only(device, dir='experiment'):
-    rollout_record = torch.load(args.rollout_filename)[:args.episodes]
-    subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
-    print(subspace)
+    # rollout_record = torch.load(args.rollout_filename)[:args.episodes]
+    # subspace = utils.min_subspace(rollout_record, args.wsSize, args.method)
+    # print(subspace)
+    # >>>> badthing here
+    # subspace = [[1,2], [1], [1,1,1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [1,2], [1], [2],      [1,2], [1], [2], [1], [2],      [1,2], [1], [2], [1], [ 2],      [1,2], [1], [2], [1], [2]]
+    subspace = [[2, 3], [0, 1], [1], [1], [1], [0, 1], [1], [0, 1], [0, 1], [1], [0, 1], [0], [1], [0, 1], [1], [3], [1], [0, 1], [0, 1], [1], [1, 2, 3], [0, 1], [1], [0, 1], [1], [0, 1], [0, 1], [0, 1], [0, 1], [1]]
+    # >>>> end of badthing
     dr_rollout = q_darts(subspace, device)
     print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args, quant = True))
 

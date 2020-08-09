@@ -59,6 +59,7 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
         model = QuantChildCIFARNet(rollout)
     else:
         model = ChildCIFARNet(rollout)
+    print(model)
     model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -77,7 +78,7 @@ def main(device, rollout, epochs, args, quant = False):
     elif os.path.expanduser("~")[-5:] == "zyan2":
         dataPath = "~/Private/data/CIFAR10"
     else:
-        dataPath = "/dataset/CIFAR10"
+        dataPath = "~/Private/data/CIFAR10"
     
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
@@ -112,7 +113,9 @@ if __name__ == "__main__":
     # rollout = [0, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 2, 1, 2, 0, 0, 1, 1, 2, 0, 1, 2, 1, 2, 1, 0, 1, 1, 2]
     # rollout = [1, 0, 2, 1, 2, 0, 1, 2, 0, 2, 1, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2]
     # rollout = [0, 1, 2, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 0, 2, 0, 0, 1, 1, 2]
-    rollout = [1, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 1, 2, 1, 2, 0, 1, 1, 1, 2, 0, 0, 2, 1, 2, 1, 0, 2, 1, 2]
+    # rollout = [1, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 1, 2, 1, 2, 0, 1, 1, 1, 2, 0, 0, 2, 1, 2, 1, 0, 2, 1, 2]
+    rollout = [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]
+    # rollout = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     print("Rollout:", rollout)
-    device = torch.device(args.device)
+    device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print("Best accuracy", main(device, rollout, 60, args, True))
