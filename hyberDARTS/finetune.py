@@ -62,12 +62,15 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
     print(model)
     model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
     best_acc = 0
     for _ in range(epochs):
+        scheduler.step()
         train(device, trainLoader, criterion, optimizer, model)
         acc = test(device, testloader, criterion, optimizer, model)
-        # print(acc)
+        print(acc)
         if acc > best_acc:
             best_acc = acc
     return best_acc
@@ -114,8 +117,10 @@ if __name__ == "__main__":
     # rollout = [1, 0, 2, 1, 2, 0, 1, 2, 0, 2, 1, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2]
     # rollout = [0, 1, 2, 1, 2, 0, 1, 2, 1, 2, 0, 0, 2, 1, 2, 0, 1, 1, 1, 2, 0, 1, 2, 0, 2, 0, 0, 1, 1, 2]
     # rollout = [1, 1, 2, 1, 2, 0, 1, 2, 1, 2, 1, 1, 2, 1, 2, 0, 1, 1, 1, 2, 0, 0, 2, 1, 2, 1, 0, 2, 1, 2]
-    rollout = [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]
-    # rollout = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    rollout = [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1] # darts searched
+    rollout = [2, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 3, 1, 0, 1, 1, 3, 1, 1, 1, 1, 1, 0, 0, 0, 1] # err.625 @ 96 --> 87.17
+    
+    rollout = [3, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 3, 1, 1, 1, 1, 2, 0, 1, 0, 1, 0, 0, 1, 1, 1] # err.625 @ 50 --> 84.93
     print("Rollout:", rollout)
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    print("Best accuracy", main(device, rollout, 60, args, True))
+    print("Best accuracy", main(device, rollout, 100, args, True))

@@ -208,7 +208,8 @@ class QuantChildCIFARNet(nn.Module):
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         num_layers = len(rollout)//5
         int_choice =  (1,3)
-        frac_choice = (1,3,6)
+        # frac_choice = (1,3,6)
+        frac_choice = (3,6)
         arch_params = []
         quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
