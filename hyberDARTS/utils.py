@@ -171,10 +171,10 @@ def parse_quant_dr_rollout(subspace, rollout_record):
     for i in range(len(slice_zie)):
         op_choice = rollout_record[slice_point[i]]
         start = i * 5
-        w_i_s = subspace[start + 1]
-        w_f_s = subspace[start + 2]
-        a_i_s = subspace[start + 3]
-        a_f_s = subspace[start + 4]
+        w_i_s = subspace[start + 3]
+        w_f_s = subspace[start + 4]
+        a_i_s = subspace[start + 1]
+        a_f_s = subspace[start + 2]
         layer_quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
         for wi in range(len(w_i_s)):
@@ -184,7 +184,7 @@ def parse_quant_dr_rollout(subspace, rollout_record):
                         new_quant = [w_i_s[wi], w_f_s[wf], a_i_s[ai], a_f_s[af]]
                         layer_quant_params.append(new_quant)
         quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
-        rollout_output.append(op_choice)
+        rollout_output.append(subspace[start][op_choice])
         rollout_output += quant_params
     
     return rollout_output
@@ -221,13 +221,13 @@ if __name__ == "__main__":
         [3, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 3, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1], 
         [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 1, 0, 1, 1, 3, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1], 
         [3, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1]]
-    print(RL2DR_rollout(q_rollouts[0], quant=True))
-    print(len(RL2DR_rollout(q_rollouts[0], quant=True)))
+    # print(RL2DR_rollout(q_rollouts[0], quant=True))
+    # print(len(RL2DR_rollout(q_rollouts[0], quant=True)))
     size = 2
     subspace = min_subspace(q_rollouts[:size], size, quant = True)
     print(subspace)
     print(len(subspace))
-    rollout_record = [1, 2, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 3, 2, 1, 1, 0, 3]
+    rollout_record = [0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 3, 3, 1, 0, 0, 3]
     rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
     print(rollout_output)
 

@@ -141,10 +141,10 @@ class QuantCIFARNet(nn.Module):
         for i in range(num_layers):
             start = i * 5
             arch_params.append(subspace[start])
-            w_i_s = subspace[start + 1]
-            w_f_s = subspace[start + 2]
-            a_i_s = subspace[start + 3]
-            a_f_s = subspace[start + 4]
+            w_i_s = subspace[start + 3]
+            w_f_s = subspace[start + 4]
+            a_i_s = subspace[start + 1]
+            a_f_s = subspace[start + 2]
             layer_quant_params = []
             for wi in range(len(w_i_s)):
                 for wf in range(len(w_f_s)):
@@ -216,10 +216,10 @@ class QuantChildCIFARNet(nn.Module):
         for i in range(num_layers):
             start = i * 5
             arch_params.append(rollout[start])
-            w_i_s = rollout[start + 1]
-            w_f_s = rollout[start + 2]
-            a_i_s = rollout[start + 3]
-            a_f_s = rollout[start + 4]
+            w_i_s = rollout[start + 3]
+            w_f_s = rollout[start + 4]
+            a_i_s = rollout[start + 1]
+            a_f_s = rollout[start + 2]
             new_quant = {}
             new_quant[quant_keys[0]] = int_choice[w_i_s]
             new_quant[quant_keys[1]] = frac_choice[w_f_s]
