@@ -63,12 +63,13 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
     model.to(device)
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.Adam(model.parameters(), lr=0.001)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD( model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4, nesterov=True)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
     best_acc = 0
     for _ in range(epochs):
-        scheduler.step()
         train(device, trainLoader, criterion, optimizer, model)
+        scheduler.step()
         acc = test(device, testloader, criterion, optimizer, model)
         print(acc)
         if acc > best_acc:
