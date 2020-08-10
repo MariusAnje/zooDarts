@@ -192,7 +192,8 @@ if __name__ == "__main__":
         [3, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1]]
     print(RL2DR_rollout(q_rollouts[0], quant=True))
     print(len(RL2DR_rollout(q_rollouts[0], quant=True)))
-    subspace = min_subspace(q_rollouts, 3, quant = True)
+    size = 2
+    subspace = min_subspace(q_rollouts[:size], size, quant = True)
     print(subspace)
     print(len(subspace))
 
