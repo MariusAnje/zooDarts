@@ -69,7 +69,7 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
     best_acc = 0
     for _ in range(epochs):
         train(device, trainLoader, criterion, optimizer, model)
-        scheduler.step()
+        # scheduler.step()
         acc = test(device, testloader, criterion, optimizer, model)
         print(acc)
         if acc > best_acc:
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     rollout = [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1] # darts searched
     rollout = [2, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 3, 1, 0, 1, 1, 3, 1, 1, 1, 1, 1, 0, 0, 0, 1] # err.625 @ 96 --> 87.17
     
-    rollout = [3, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 3, 1, 1, 1, 1, 2, 0, 1, 0, 1, 0, 0, 1, 1, 1] # err.625 @ 50 --> 84.93
+    # rollout = [3, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 3, 1, 1, 1, 1, 2, 0, 1, 0, 1, 0, 0, 1, 1, 1] # err.625 @ 50 --> 84.93
     print("Rollout:", rollout)
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print("Best accuracy", main(device, rollout, 100, args, True))
