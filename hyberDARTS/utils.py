@@ -158,6 +158,37 @@ def accuracy_analysis(fn:str, ep:int, th:int=4000):
         final_subspace.append(item[0])
     return final_subspace
 
+def parse_quant_dr_rollout(subspace, rollout_record):
+    rollout = [0 for i in range(len(subspace))]
+    slice_point = [0]
+    slice_zie   = []
+    for i in range(0,len(subspace),5):
+        slice_zie.append(len(subspace[i]) + 1)
+    for i in range(len(slice_zie)):
+        slice_point.append(slice_zie[i] + slice_point[i])
+
+    rollout_output = []
+    for i in range(len(slice_zie)):
+        op_choice = rollout_record[slice_point[i]]
+        start = i * 5
+        w_i_s = subspace[start + 1]
+        w_f_s = subspace[start + 2]
+        a_i_s = subspace[start + 3]
+        a_f_s = subspace[start + 4]
+        layer_quant_params = []
+        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+        for wi in range(len(w_i_s)):
+            for wf in range(len(w_f_s)):
+                for ai in range(len(a_i_s)):
+                    for af in range(len(a_f_s)):
+                        new_quant = [w_i_s[wi], w_f_s[wf], a_i_s[ai], a_f_s[af]]
+                        layer_quant_params.append(new_quant)
+        quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
+        rollout_output.append(op_choice)
+        rollout_output += quant_params
+    
+    return rollout_output
+
 if __name__ == "__main__":
     # import torch
     # record = torch.load("rollout_record")
@@ -196,4 +227,7 @@ if __name__ == "__main__":
     subspace = min_subspace(q_rollouts[:size], size, quant = True)
     print(subspace)
     print(len(subspace))
+    rollout_record = [1, 2, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 3, 2, 1, 1, 0, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
+    print(rollout_output)
 

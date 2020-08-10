@@ -542,7 +542,8 @@ def quant_darts_only(device, dir='experiment'):
     subspace = [[0, 3], [0, 1], [0, 1], [1], [1], [1, 3], [0, 1], [1], [0], [1], [0], [0], [1], [1], [1], [2, 3], [1], [0, 1], [1], [1], [2, 3], [0, 1], [0, 1], [0], [1], [0, 2], [0, 1], [1], [1], [1]] # err.625 ep 80 size 2
     # >>>> end of badthing
     dr_rollout = q_darts(subspace, device)
-    print("DR best arch acc: ", finetune.main(device, dr_rollout, 60, args, quant = True))
+    rollout_output = utils.parse_quant_dr_rollout(subspace, dr_rollout)
+    print("DR best arch acc: ", finetune.main(device, rollout_output, 1, args, quant = True))
 
 SCRIPT = {
     'nas': nas,
