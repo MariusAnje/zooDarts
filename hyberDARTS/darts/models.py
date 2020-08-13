@@ -130,7 +130,7 @@ class QuantCIFARNet(nn.Module):
         return convList
     
     def getParams(self, subspace):
-        num_layers = len(subspace)//5
+        num_layers = len(subspace)//3
         int_choice =  (1,3)
         # frac_choice = (1,3,6)
         # frac_choice = (6,7,8)
@@ -138,24 +138,48 @@ class QuantCIFARNet(nn.Module):
         arch_params = []
         quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+
+        """
+            These are for quant space of 4
+        """
+        # for i in range(num_layers):
+        #     start = i * 5
+        #     arch_params.append(subspace[start])
+        #     w_i_s = subspace[start + 3]
+        #     w_f_s = subspace[start + 4]
+        #     a_i_s = subspace[start + 1]
+        #     a_f_s = subspace[start + 2]
+        #     layer_quant_params = []
+        #     for wi in range(len(w_i_s)):
+        #         for wf in range(len(w_f_s)):
+        #             for ai in range(len(a_i_s)):
+        #                 for af in range(len(a_f_s)):
+        #                     new_quant = {}
+        #                     new_quant[quant_keys[0]] = int_choice[w_i_s[wi]]
+        #                     new_quant[quant_keys[1]] = frac_choice[w_f_s[wf]]
+        #                     new_quant[quant_keys[2]] = int_choice[a_i_s[ai]]
+        #                     new_quant[quant_keys[3]] = frac_choice[a_f_s[af]]
+        #                     layer_quant_params.append(new_quant)
+
+
+        """
+            These are for quant space of 2
+        """
         for i in range(num_layers):
-            start = i * 5
+            start = i * 3
             arch_params.append(subspace[start])
-            w_i_s = subspace[start + 3]
-            w_f_s = subspace[start + 4]
-            a_i_s = subspace[start + 1]
-            a_f_s = subspace[start + 2]
+            a_s = subspace[start + 1]
+            w_s = subspace[start + 2]
+            
             layer_quant_params = []
-            for wi in range(len(w_i_s)):
-                for wf in range(len(w_f_s)):
-                    for ai in range(len(a_i_s)):
-                        for af in range(len(a_f_s)):
-                            new_quant = {}
-                            new_quant[quant_keys[0]] = int_choice[w_i_s[wi]]
-                            new_quant[quant_keys[1]] = frac_choice[w_f_s[wf]]
-                            new_quant[quant_keys[2]] = int_choice[a_i_s[ai]]
-                            new_quant[quant_keys[3]] = frac_choice[a_f_s[af]]
-                            layer_quant_params.append(new_quant)
+            for w in range(len(w_s)):
+                for a in range(len(a_s)):
+                    new_quant = {}
+                    new_quant[quant_keys[0]] =  int_choice[w_s[w][0]]
+                    new_quant[quant_keys[1]] = frac_choice[w_s[w][1]]
+                    new_quant[quant_keys[2]] =  int_choice[a_s[a][0]]
+                    new_quant[quant_keys[3]] = frac_choice[a_s[a][1]]
+                    layer_quant_params.append(new_quant)
             quant_params.append(layer_quant_params)
         return arch_params, quant_params
 

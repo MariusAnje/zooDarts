@@ -6,16 +6,20 @@ def space_recognition(record, quant):
     if quant:
         usefulList = [0, 8, 16, 24, 32, 40]
         newList = []
-        for i in usefulList:
-            newList.append(i)
-            newList += list(range(i+4,i+8))
-        usefulList = newList
+        # for i in usefulList:
+        #     newList.append(i)
+        #     newList += list(range(i+4,i+8))
+        # usefulList = newList
         usefulRecord = []
         for j in usefulList:
-            recordItem = []
+            recordItemOp = []
+            recordItemA  = []
+            recordItemW  = []
             for i in range(len(record)):
-                recordItem.append(record[i][j])
-            usefulRecord.append(recordItem)
+                recordItemOp.append(record[i][j])
+                recordItemA.append(tuple(record[i][j+4:j+6]))
+                recordItemW.append(tuple(record[i][j+6:j+8]))
+            usefulRecord += [recordItemOp, recordItemA, recordItemW]
         return usefulRecord
     else:
         usefulList = [0, 4, 8, 12, 16, 20]
@@ -41,6 +45,14 @@ def working_set(record, size, quant):
         WS.append(WSLine)
         WSSize.append(WSSizeLine)
     return WS, WSSize
+
+def clear_recurse(WS:list):
+    cleared = []
+    for item in WS:
+        if len(item) > 1:
+            raise Exception("Only list with one item is clearable")
+        cleared.append(item[0])
+    return cleared
 
 def min_working_set(WS, WSSize, find_type):
     if find_type == "mult":
@@ -223,11 +235,12 @@ if __name__ == "__main__":
         [3, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1]]
     # print(RL2DR_rollout(q_rollouts[0], quant=True))
     # print(len(RL2DR_rollout(q_rollouts[0], quant=True)))
-    size = 2
-    subspace = min_subspace(q_rollouts[:size], size, quant = True)
+    size = 3
+    WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
+    subspace = clear_recurse(WS)
     print(subspace)
     print(len(subspace))
-    rollout_record = [0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 3, 3, 1, 0, 0, 3]
-    rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
-    print(rollout_output)
+    # rollout_record = [0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 3, 3, 1, 0, 0, 3]
+    # rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
+    # print(rollout_output)
 
