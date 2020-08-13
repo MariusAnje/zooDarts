@@ -1,3 +1,6 @@
 *RLDR*
 *record_new*
 archive/
+output*
+err*
+*_traces/
