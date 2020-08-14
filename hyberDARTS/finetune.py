@@ -137,9 +137,13 @@ if __name__ == "__main__":
     # rollout = [0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1] # darts ep 80 top 2 size 2 # 4
     # rollout = [0, 1, 1, 0, 1, 3, 0, 1, 1, 1, 0, 1, 1, 0, 1, 3, 1, 1, 1, 0, 3, 0, 1, 1, 1, 2, 1, 1, 1, 1] # 3412
     # rollout = [0, 0, 1, 1, 1, 3, 1, 1, 0, 1, 0, 0, 1, 1, 1, 3, 1, 0, 1, 1, 3, 1, 1, 0, 1, 2, 1, 1, 1, 1] # 1234
+    
+    rollout = [0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 3, 1, 1, 1, 1, 3, 0, 1, 0, 1, 0, 1, 1, 0, 1] # 12 darts ep 80 top 3 size 3 quant 2
+
+    rollout = [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 0, 0, 0, 1, 3, 0, 1, 0, 1, 0, 0, 0, 1, 1] # err.630 rollout 177
 
     print("Rollout:", rollout)
     print("3412-1")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    # print("Best accuracy", main(device, rollout, 100, args, True))
+    # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, 100, args, True))
