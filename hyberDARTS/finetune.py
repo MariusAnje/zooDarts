@@ -37,8 +37,10 @@ def train(device, loader, criterion, optimizer, model):
         inputs = quantize(inputs, 8, 8, signed=True)
         outputs = model(inputs)
         loss = criterion(outputs, labels)
+        running_loss += loss.item()
         loss.backward()
         optimizer.step()
+    return running_loss / i
 
 def test(device, loader, criterion, optimizer, model):
     model.eval()
@@ -65,16 +67,16 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
     print(model)
     model.to(device)
     criterion = nn.CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    optimizer = optim.SGD( model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    # optimizer = optim.SGD( model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4, nesterov=True)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
     best_acc = 0
     for _ in range(epochs):
-        train(device, trainLoader, criterion, optimizer, model)
+        loss = train(device, trainLoader, criterion, optimizer, model)
         scheduler.step()
         acc = test(device, testloader, criterion, optimizer, model)
-        print(acc)
+        print(f"loss: {loss:.4f}, acc: {acc}")
         if acc > best_acc:
             best_acc = acc
     return best_acc
@@ -113,6 +115,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Parser User Input Arguments')
     parser.add_argument('--batchSize', action="store", type=int, default=128)
     parser.add_argument('--device', action="store", type=str, default="cuda:0")
+    parser.add_argument('--epochs', action="store", type=int, default=100)
     args = parser.parse_args()
     rollout = [1,1,1,1,1,1]
     # rollout = [3,3,3,3,3,3]
@@ -142,8 +145,64 @@ if __name__ == "__main__":
 
     rollout = [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 0, 0, 0, 1, 3, 0, 1, 0, 1, 0, 0, 0, 1, 1] # err.630 rollout 177
 
+    rollout = [3, 0, 1, 1, 1, 
+               1, 1, 0, 1, 1, 
+               3, 1, 0, 1, 0, 
+               2, 1, 1, 0, 0, 
+               1, 0, 1, 0, 1, 
+               1, 1, 0, 0, 0] # proxyless 1 order 52.93
+    
+    # rollout = [3,  1, 1, 0, 1,
+    #            1,  1, 1, 1, 0,
+    #            3,  1, 0, 1, 0,
+    #            2,  0, 0, 1, 1,
+    #            1,  0, 1, 0, 1,
+    #            1,  0, 0, 1, 0, ] # proxyless 1 reverse
+    
+    # rollout = [3, 1, 0, 0, 1,
+    #            2, 1, 0, 0, 0,
+    #            3, 1, 0, 1, 1,
+    #            1, 0, 1, 0, 1,
+    #            0, 0, 1, 1, 1,
+    #            2, 0, 0, 1, 1, ] # proxyless 2 84.13
+    
+    # rollout = [3,  0, 1, 1, 0,
+    #            2,  0, 0, 1, 0,
+    #            3,  1, 1, 1, 0,
+    #            1,  0, 1, 0, 1,
+    #            0,  1, 1, 0, 1,
+    #            2,  1, 1, 0, 0,] # proxyless 2 reverse 10.00
+    
+    rollout = [2, 1, 1, 1, 1,
+               3, 1, 0, 1, 1,
+               2, 1, 1, 1, 1,
+               2, 1, 1, 1, 1,
+               0, 1, 1, 1, 1,
+               3, 1, 1, 1, 1,] # proxyless 3 reverse
+    
+    # rollout = [2, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,
+    #            2, 1, 1, 1, 1,
+    #            2, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,] # GG
+    
+    # rollout = [1, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,
+    #            1, 1, 1, 1, 1,] # best 92.23
+    
+    # rollout = [3, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,] # largest 89.98
+
     print("Rollout:", rollout)
-    print("3412-1")
+    print("proxyless 3 reverse")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
-    print("Best accuracy", main(device, rollout, 100, args, True))
+    print("Best accuracy", main(device, rollout, args.epochs, args, True))
