@@ -142,17 +142,17 @@ if __name__ == "__main__":
     # rollout = [0, 0, 1, 1, 1, 3, 1, 1, 0, 1, 0, 0, 1, 1, 1, 3, 1, 0, 1, 1, 3, 1, 1, 0, 1, 2, 1, 1, 1, 1] # 1234
     
     rollout = [0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 3, 1, 1, 1, 1, 3, 0, 1, 0, 1, 0, 1, 1, 0, 1] # 12 darts ep 80 top 2 size 2 quant 2
-    # rollout = [0, 1, 1, 1, 0, 3, 0, 1, 0, 1, 0, 0, 1, 0, 1, 3, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1] # 12 darts ep 80 top 3 size 3 quant 2
+    rollout = [0, 1, 1, 1, 0, 3, 0, 1, 0, 1, 0, 0, 1, 0, 1, 3, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1] # 12 darts ep 80 top 3 size 3 quant 2
     # rollout = [0, 1, 0, 1, 1, 3, 0, 1, 0, 1, 0, 0, 1, 0, 1, 3, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1] # 21 darts ep 80 top 3 size 3 quant 2
 
     # rollout = [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 0, 0, 0, 1, 3, 0, 1, 0, 1, 0, 0, 0, 1, 1] # err.630 rollout 177
 
-    rollout = [3, 0, 1, 1, 1, 
-               1, 1, 0, 1, 1, 
-               3, 1, 0, 1, 0, 
-               2, 1, 1, 0, 0, 
-               1, 0, 1, 0, 1, 
-               1, 1, 0, 0, 0] # proxyless 1 order 52.93
+    # rollout = [3, 0, 1, 1, 1, 
+    #            1, 1, 0, 1, 1, 
+    #            3, 1, 0, 1, 0, 
+    #            2, 1, 1, 0, 0, 
+    #            1, 0, 1, 0, 1, 
+    #            1, 1, 0, 0, 0] # proxyless 1 order 52.93
     
     # rollout = [3,  1, 1, 0, 1,
     #            1,  1, 1, 1, 0,
@@ -175,12 +175,12 @@ if __name__ == "__main__":
     #            0,  1, 1, 0, 1,
     #            2,  1, 1, 0, 0,] # proxyless 2 reverse 10.00
     
-    rollout = [2, 1, 1, 1, 1,
-               3, 1, 0, 1, 1,
-               2, 1, 1, 1, 1,
-               2, 1, 1, 1, 1,
-               0, 1, 1, 1, 1,
-               3, 1, 1, 1, 1,] # proxyless 3 reverse
+    # rollout = [2, 1, 1, 1, 1,
+    #            3, 1, 0, 1, 1,
+    #            2, 1, 1, 1, 1,
+    #            2, 1, 1, 1, 1,
+    #            0, 1, 1, 1, 1,
+    #            3, 1, 1, 1, 1,] # proxyless 3 reverse 91.36
     
     # rollout = [2, 1, 1, 1, 1,
     #            3, 1, 1, 1, 1,
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     #            3, 1, 1, 1, 1,] # largest 89.98
 
     print("Rollout:", rollout)
-    print("proxyless 3 reverse")
+    print("12 darts ep 80 top 3 size 3 quant 2")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))

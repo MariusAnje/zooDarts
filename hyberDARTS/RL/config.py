@@ -11,7 +11,7 @@ ARCH_SPACE = {
     }
 
 """
->>>>>>>>>>>>These line deleted
+>>>>>>>>>>>>These lines deleted
 # QUAN_SPACE = {
 #     "act_num_int_bits": (0, 1, 2, 3),
 #     "act_num_frac_bits": (0, 1, 2, 3, 4, 5, 6),
@@ -24,9 +24,9 @@ ARCH_SPACE = {
 # >>>>>>>>>>These lines added
 QUAN_SPACE = {
     "act_num_int_bits": (1, 3),
-    "act_num_frac_bits": (3, 6),
+    "act_num_frac_bits": (1, 3, 6),
     "weight_num_int_bits": (1, 3),
-    "weight_num_frac_bits": (3, 6),
+    "weight_num_frac_bits": (1, 3, 6),
     }
 # >>>>>>>>>>Ends here
 
