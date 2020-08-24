@@ -11,7 +11,6 @@ def fit(model, optimizer=None, train_data=None, val_data=None, epochs=40,
     loss = []
     timer = Timer()
     timer.reset()
-    print(optimizer)
     for epoch in range(epochs):
         if lr_schedule is not None:
             lr_schedule(optimizer, epoch)

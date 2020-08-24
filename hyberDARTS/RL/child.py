@@ -188,9 +188,9 @@ class CNN(nn.Module):
             if do_bn is True:
                 setattr(self, 'bn_{}'.format(cell.id), cell.bn)
         self.num_features = compute_num_features(self.graph[-1].output_shape)
-        self.fc1 = nn.Linear(self.num_features, 256)
-        self.fc_bn = nn.BatchNorm1d(256)
-        self.fc2 = nn.Linear(256, num_classes)
+        self.fc1 = nn.Linear(self.num_features, 1024)
+        # self.fc_bn = nn.BatchNorm1d(256)
+        self.fc2 = nn.Linear(1024, num_classes)
         self.init_model()
 
     def init_model(self, model_init='he_fout', init_div_groups=False):
@@ -282,7 +282,8 @@ class CNN(nn.Module):
         x = self.fc1(x)
         x = F.relu(x)
         if self.do_bn is True:
-            x = self.fc_bn(x)
+            # x = self.fc_bn(x)
+            pass
         x = nn.Dropout(p=0.5)(x)
         x = self.fc2(x)
         return x
