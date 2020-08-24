@@ -220,8 +220,8 @@ def parse_quant_dr_rollout(subspace, rollout_record):
     for i in range(len(slice_zie)):
         op_choice = rollout_record[slice_point[i]]
         start = i * 3
-        a_s = subspace[start + 2]
-        w_s = subspace[start + 1]
+        a_s = subspace[start + 1]
+        w_s = subspace[start + 2]
         layer_quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
 
