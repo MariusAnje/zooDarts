@@ -191,6 +191,34 @@ class CNN(nn.Module):
         self.fc1 = nn.Linear(self.num_features, 256)
         self.fc_bn = nn.BatchNorm1d(256)
         self.fc2 = nn.Linear(256, num_classes)
+        self.init_model()
+
+    def init_model(self, model_init='he_fout', init_div_groups=False):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                if model_init == 'he_fout':
+                    n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                    if init_div_groups:
+                        n /= m.groups
+                    m.weight.data.normal_(0, math.sqrt(2. / n))
+                elif model_init == 'he_fin':
+                    n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+                    if init_div_groups:
+                        n /= m.groups
+                    m.weight.data.normal_(0, math.sqrt(2. / n))
+                elif model_init == 'None':
+                    pass
+                else:
+                    raise NotImplementedError
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def forward(self, x, quan_paras=None):
         if quan_paras is not None:
