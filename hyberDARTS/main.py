@@ -35,6 +35,7 @@ from darts import get_data
 
 import utils
 import finetune
+import time
 
 
 # def get_args():
@@ -193,7 +194,8 @@ def sync_search(device, dir='experiment'):
         dir, f"rLut={args.rLUT}, rThroughput={args.rThroughput}")
     if os.path.exists(dir) is False:
         os.makedirs(dir)
-    filepath = os.path.join(dir, f"joint ({args.episodes} episodes)")
+    time_stamp = time.strftime("%m%d_%H%M%S", time.localtime())
+    filepath = os.path.join(dir, f"joint_ep_{args.episodes}_{time_stamp}")
     logger = get_logger(filepath)
     csvfile = open(filepath+'.csv', mode='w+', newline='')
     writer = csv.writer(csvfile)
@@ -549,7 +551,7 @@ def quant_darts_only(device, dir='experiment'):
     """
         quant space of 2
     """
-    
+
     subspace = [[0, 3], [(0, 1), (1, 0)], [(1, 1)], [1, 3], [(0, 1), (1, 1)], [(0, 1)], [0], [(0, 1)], [(1, 1)], [2, 3], [(1, 0), (1, 1)], [(1, 1)], [2, 3], [(0, 1), (1, 0)], [(0, 1)], [0, 2], [(0, 1), (1, 1)], [(1, 1)]] # ep 80 size = 2 --> 6873
     subspace = [[0, 3], [(0, 1), (1, 0)], [(0, 1), (1, 1)], [0, 1, 3], [(0, 1), (1, 1)], [(0, 1), (1, 1)], [0, 3], [(0, 1)], [(0, 1), (1, 1)], [1, 2, 3], [(1, 0), (0, 0), (1, 1)], [(1, 1)], [0, 2, 3], [(0, 1), (1, 0), (1, 1)], [(0, 1), (1, 1)], [0, 1, 2], [(0, 1), (1, 1)], [(1, 1)]] # ep 80 size = 3 --> 11157 MB
     # subspace = [[0, 3], [(0, 1), (1, 0)], [(0, 1), (1, 0), (1, 1)], [0, 1, 3], [(0, 1), (1, 1)], [(0, 1), (1, 1)], [0, 2, 3], [(0, 1)], [(0, 1), (1, 1)], [1, 2, 3], [(1, 0), (0, 0), (1, 1)], [(1, 1)], [0, 2, 3], [(0, 1), (1, 0), (1, 1)], [(0, 1), (1, 1)], [0, 1, 2], [(0, 1), (0, 0), (1, 1)], [(1, 1)]] # ep 80 size = 4 --> OOM
