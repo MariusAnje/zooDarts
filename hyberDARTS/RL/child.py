@@ -349,7 +349,8 @@ def get_model(input_shape, paras, num_classes, device=torch.device('cpu'),
     if device.type != 'cpu' and multi_gpu is True:
         print("using parallel data")
         model = torch.nn.DataParallel(model)
-    return model.to(device), get_optimizer(model, 'SGD')
+    # return model.to(device), get_optimizer(model, 'SGD')
+    return model.to(device), get_optimizer(model, 'Adam')
 
 
 def get_optimizer(model, name='SGD'):
