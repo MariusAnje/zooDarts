@@ -285,7 +285,8 @@ if __name__ == "__main__":
     subspace = clear_recurse(WS)
     print(subspace)
     print(len(subspace))
-    rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
+    # rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
+    rollout_record = [1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 3, 1, 0, 1, 3]
     rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
     print(rollout_output)
 

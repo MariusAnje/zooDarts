@@ -203,6 +203,8 @@ if __name__ == "__main__":
     #            3, 1, 1, 1, 1,
     #            3, 1, 1, 1, 1,] # largest 89.98
 
+    rollout = [2, 0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 2, 0, 0, 1, 1, 3, 1, 0, 1, 1, 0, 1, 0, 1, 1] # 21 darts ep 30 top 3 size 3 quant 2
+
     print("Rollout:", rollout)
     print("12 darts ep 80 top 3 size 3 quant 2")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
