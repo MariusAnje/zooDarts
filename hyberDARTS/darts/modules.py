@@ -174,15 +174,17 @@ class QuantBlock(nn.Module):
             bias   = self.quant_weight(bias)
 
             x = F.conv2d(x, weight, bias, stride, padding, dilation, groups)
-            x = self.act(x)
+            
             # x = quantize(
             #     x,
             #     self.quant_params['act_num_int_bits'],
             #     self.quant_params['act_num_frac_bits'],
             #     signed=False
             #     )
-            x = self.quant_act(x)
+            
             x = self.norm(x)
+            x = self.act(x)
+            x = self.quant_act(x)
             return x
         else:
             return self.norm(self.act(self.op(x)))

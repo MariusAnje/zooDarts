@@ -172,32 +172,67 @@ def accuracy_analysis(fn:str, ep:int, th:int=4000):
 
 def parse_quant_dr_rollout(subspace, rollout_record):
     rollout = [0 for i in range(len(subspace))]
+
+    """
+        These are for quant space of 4
+    """
+    # slice_point = [0]
+    # slice_zie   = []
+    # for i in range(0,len(subspace),5):
+    #     slice_zie.append(len(subspace[i]) + 1)
+    # for i in range(len(slice_zie)):
+    #     slice_point.append(slice_zie[i] + slice_point[i])
+
+    # rollout_output = []
+    
+    # for i in range(len(slice_zie)):
+    #     op_choice = rollout_record[slice_point[i]]
+    #     start = i * 5
+    #     w_i_s = subspace[start + 3]
+    #     w_f_s = subspace[start + 4]
+    #     a_i_s = subspace[start + 1]
+    #     a_f_s = subspace[start + 2]
+    #     layer_quant_params = []
+    #     quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+
+    #     for wi in range(len(w_i_s)):
+    #         for wf in range(len(w_f_s)):
+    #             for ai in range(len(a_i_s)):
+    #                 for af in range(len(a_f_s)):
+    #                     new_quant = [w_i_s[wi], w_f_s[wf], a_i_s[ai], a_f_s[af]]
+    #                     layer_quant_params.append(new_quant)
+    #     quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
+    #     rollout_output.append(subspace[start][op_choice])
+    #     rollout_output += quant_params
+
+    """
+        These are for quant space of 2
+    """
     slice_point = [0]
     slice_zie   = []
-    for i in range(0,len(subspace),5):
+    for i in range(0,len(subspace),3):
         slice_zie.append(len(subspace[i]) + 1)
     for i in range(len(slice_zie)):
         slice_point.append(slice_zie[i] + slice_point[i])
 
     rollout_output = []
+
     for i in range(len(slice_zie)):
         op_choice = rollout_record[slice_point[i]]
-        start = i * 5
-        w_i_s = subspace[start + 3]
-        w_f_s = subspace[start + 4]
-        a_i_s = subspace[start + 1]
-        a_f_s = subspace[start + 2]
+        start = i * 3
+        a_s = subspace[start + 2]
+        w_s = subspace[start + 1]
         layer_quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
-        for wi in range(len(w_i_s)):
-            for wf in range(len(w_f_s)):
-                for ai in range(len(a_i_s)):
-                    for af in range(len(a_f_s)):
-                        new_quant = [w_i_s[wi], w_f_s[wf], a_i_s[ai], a_f_s[af]]
-                        layer_quant_params.append(new_quant)
+
+        for w in range(len(w_s)):
+            for a in range(len(a_s)):
+                new_quant = [w_s[w][0], w_s[w][1], a_s[a][0], a_s[a][1]]
+                layer_quant_params.append(new_quant)
         quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
         rollout_output.append(subspace[start][op_choice])
         rollout_output += quant_params
+    
     
     return rollout_output
 
@@ -250,7 +285,7 @@ if __name__ == "__main__":
     subspace = clear_recurse(WS)
     print(subspace)
     print(len(subspace))
-    # rollout_record = [0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 3, 3, 1, 0, 0, 3]
-    # rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
-    # print(rollout_output)
+    rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
+    print(rollout_output)
 
