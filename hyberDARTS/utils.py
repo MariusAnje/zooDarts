@@ -220,8 +220,8 @@ def parse_quant_dr_rollout(subspace, rollout_record):
     for i in range(len(slice_zie)):
         op_choice = rollout_record[slice_point[i]]
         start = i * 3
-        a_s = subspace[start + 2]
-        w_s = subspace[start + 1]
+        a_s = subspace[start + 1]
+        w_s = subspace[start + 2]
         layer_quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
 
@@ -295,13 +295,14 @@ if __name__ == "__main__":
         [1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 2, 1, 2, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 2, 1, 2], # 12.838
     ]
 
-    size = 3
+    size = 2
     WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
     subspace = clear_recurse(WS)
     print(subspace)
     print(len(subspace))
     # rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
-    rollout_record = [1, 0, 0, 0, 3, 0, 1, 1, 1, 3, 3, 1, 1, 0, 1, 3, 2, 3]
+    rollout_record = [1, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
+    # rollout_record = [0, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
     rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
     print(rollout_output)
 

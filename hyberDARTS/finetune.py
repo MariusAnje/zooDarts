@@ -72,13 +72,18 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
     # optimizer = optim.SGD( model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4, nesterov=True)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
     best_acc = 0
-    for _ in range(epochs):
+    for i in range(epochs):
         loss = train(device, trainLoader, criterion, optimizer, model)
         scheduler.step()
         acc = test(device, testloader, criterion, optimizer, model)
         print(f"loss: {loss:.4f}, acc: {acc}")
         if acc > best_acc:
             best_acc = acc
+        
+        if i == 5:
+            if best_acc <= 0.15:
+                print("Bad Arch!!!")
+                return best_acc
     return best_acc
 
 def main(device, rollout, epochs, args, quant = False):
@@ -215,11 +220,14 @@ if __name__ == "__main__":
     # rollout = [3, 1, 2, 0, 2, 0, 1, 2, 0, 2, 2, 0, 1, 0, 2, 3, 1, 1, 0, 2, 3, 1, 0, 0, 2, 2, 1, 1, 1, 2] # 21 darts ep 40 e 10 top 2 size 2 quant 2 90.29
 
     rollout = [2, 0, 1, 0, 2, 1, 1, 0, 0, 1, 2, 1, 1, 1, 1, 0, 0, 1, 1, 2, 1, 0, 0, 1, 2, 3, 1, 2, 0, 2] # RL err.2176 (e10) ep 6 87.15
-    # rollout = [3, 0, 1, 0, 2, 1, 1, 2, 0, 2, 3, 0, 0, 0, 2, 2, 0, 2, 1, 2, 2, 1, 0, 0, 2, 0, 0, 2, 0, 1] # RL err.2174 (e10) ep 15 84.18
+
+    rollout = [3, 0, 1, 0, 2, 1, 1, 2, 0, 2, 3, 0, 0, 0, 2, 2, 0, 2, 1, 2, 2, 1, 0, 0, 2, 0, 0, 2, 0, 1] # RL err.2174 (e10) ep 15 84.18
+    rollout = [3, 0, 0, 0, 2, 0, 0, 0, 0, 2, 3, 0, 2, 1, 1, 0, 0, 2, 1, 2, 2, 1, 0, 0, 2, 0, 1, 2, 1, 2] # 21 darts ep 30 e 10 top 2 size 2 quant 2 
+    # rollout = [3, 0, 2, 0, 0, 0, 0, 2, 0, 0, 3, 0, 2, 0, 0, 0, 1, 2, 0, 2, 2, 0, 2, 1, 0, 0, 0, 1, 0, 2] # 12 darts ep 30 e 10 top 2 size 2 quant 2 
     
 
     print("Rollout:", rollout)
-    print("# RL err.2176 (e10) ep 6")
+    print("21 darts ep 30 e 10 top 2 size 2 quant 2 ")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))
