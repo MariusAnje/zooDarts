@@ -7,6 +7,8 @@ import torch.optim as optim
 from modules import LayerBlock, MixedBlock, QuantBlock
 import math
 
+out_channels = [64, 64, 128, 128, 256, 256]
+
 class SuperCIFARNet(nn.Module):
     def __init__(self, num_classes = 10):
         super(SuperCIFARNet, self).__init__()
@@ -28,7 +30,7 @@ class SuperCIFARNet(nn.Module):
         self.pool = nn.MaxPool2d(2)
         self.lastPool = nn.MaxPool2d(2)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(out_channels[-1]*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
@@ -49,7 +51,7 @@ class SuperCIFARNet(nn.Module):
         x = self.block5(x)
         x = self.block6(x)
         x = self.lastPool(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(x.size(0), -1))
         return x
 
 class SubCIFARNet(nn.Module):
@@ -57,7 +59,7 @@ class SubCIFARNet(nn.Module):
         super(SubCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
         # out_channels = [64, 64, 64, 64, 64, 64]
         in_channels = 3
 
@@ -71,7 +73,7 @@ class SubCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(out_channels[-1]*4*4, 1024),
             # nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
@@ -91,7 +93,7 @@ class SubCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(x.size(0), -1))
         # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
@@ -102,7 +104,7 @@ class QuantCIFARNet(nn.Module):
 
         # quant_params = [{'weight_num_int_bits':8,'weight_num_frac_bits':8, 'act_num_int_bits':8, 'act_num_frac_bits':8},
         # {'weight_num_int_bits':7,'weight_num_frac_bits':9, 'act_num_int_bits':7, 'act_num_frac_bits':9}]
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
         in_channels = 3
         arch_params, quant_params = self.getParams(subspace)
         norm = True
@@ -115,7 +117,7 @@ class QuantCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(out_channels[-1]*4*4, 1024),
             # nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
@@ -221,7 +223,7 @@ class QuantCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(x.size(0), -1))
         # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
@@ -230,7 +232,7 @@ class ChildCIFARNet(nn.Module):
         super(ChildCIFARNet, self).__init__()
         modules = ["CONV1", "CONV3", "CONV5", "CONV7"]
         # modules = ["CONV1","CONV3", "CONV5"]
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
         # out_channels = [64, 64, 64, 64, 64, 64]
 
         in_channels = 3
@@ -245,7 +247,7 @@ class ChildCIFARNet(nn.Module):
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
             # nn.Linear(512*4*4, 1024),
-            nn.Linear(64*4*4, 1024),
+            nn.Linear(out_channels[-1]*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
         )
@@ -253,7 +255,7 @@ class ChildCIFARNet(nn.Module):
     def forward(self, x):
         x = self.feature(x)
         # x = self.classifier(x.view(-1, 512*4*4))
-        x = self.classifier(x.view(-1, 64*4*4))
+        x = self.classifier(x.view(x.size(0), -1))
         return x
 
 class QuantChildCIFARNet(nn.Module):
@@ -280,7 +282,7 @@ class QuantChildCIFARNet(nn.Module):
             new_quant[quant_keys[2]] = int_choice[a_i_s]
             new_quant[quant_keys[3]] = frac_choice[a_f_s]
             quant_params.append(new_quant)
-        out_channels = [128, 128, 256, 256, 512, 512]
+        # out_channels = [128, 128, 256, 256, 512, 512]
         # out_channels = [64, 64, 64, 64, 64, 64]
 
         in_channels = 3
@@ -294,7 +296,7 @@ class QuantChildCIFARNet(nn.Module):
                 moduleList.append(nn.MaxPool2d(2))
         self.feature = nn.Sequential(*moduleList)
         self.classifier = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(out_channels[-1]*4*4, 1024),
             # nn.Linear(64*4*4, 1024),
             nn.ReLU(),
             nn.Linear(1024, num_classes)
@@ -330,7 +332,7 @@ class QuantChildCIFARNet(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        x = self.classifier(x.view(-1, 512*4*4))
+        x = self.classifier(x.view(x.size(0), -1))
         # x = self.classifier(x.view(-1, 64*4*4))
         return x
 
@@ -373,12 +375,13 @@ class OriNet(nn.Module):
         return x
 
 if __name__ == "__main__":
-    # subspace = [[0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3], [1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
-    # model = QuantCIFARNet(subspace)
-    # print(model)
-    rollout = [1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,]
-    model = QuantChildCIFARNet(rollout)
+    subspace = [[0, 2], [(0, 1), (1, 1)], [(1, 0), (1, 1)], [0, 1, 3], [(0, 1), (1, 1)], [(0, 1), (1, 0)], [0, 2], [(0, 1), (1, 1)], [(1, 0), (1, 1)], [0, 2], [(1, 0), (0, 0)], [(1, 1)], [0, 1, 3], [(1, 0), (0, 0), (1, 1)], [(0, 1), (1, 1)], [0, 3], [(1, 0), (0, 0)], [(0, 0), (1, 1)]]
+    model = QuantCIFARNet(subspace)
     print(model)
+    # rollout = [1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1,1,2,1,2,]
+    # model = QuantChildCIFARNet(rollout)
+    # print(model)
     x = torch.randn(16,3,32,32)
     y = model(x).sum()
+    print(y)
     y.backward()

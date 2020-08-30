@@ -56,11 +56,11 @@ def build_graph(input_shape, arch_paras):
             These lines added
         """
         if sss == 1 or sss == 2:
-            num_filters = 128
+            num_filters = 64
         if sss == 3 or sss == 4:
-            num_filters = 256
+            num_filters = 128
         if sss == 5 or sss == 6:
-            num_filters = 512
+            num_filters = 256
         """
             Ends here
         """

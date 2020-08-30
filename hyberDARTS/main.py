@@ -598,6 +598,7 @@ def main():
         )
     if os.path.exists(dir) is False:
         os.makedirs(dir)
+    print("Channels: [64,128,256]")
     SCRIPT[args.mode](device, dir)
 
 if __name__ == '__main__':
