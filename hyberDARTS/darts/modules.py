@@ -7,8 +7,12 @@ import torch.optim as optim
 import copy
 import sys
 import numpy as np
+import os
 
-GETTQDM = True
+if os.path.expanduser("~").find("afs") == -1:
+    GETTQDM = False
+else:
+    GETTQDM = True
 
 if GETTQDM:
     from tqdm import tqdm
