@@ -328,7 +328,7 @@ if __name__ == "__main__":
         ]
 
 
-    size = 4
+    size = 2
     WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
     subspace = clear_recurse(WS)
     print(subspace)
