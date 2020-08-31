@@ -220,8 +220,8 @@ def parse_quant_dr_rollout(subspace, rollout_record):
     for i in range(len(slice_zie)):
         op_choice = rollout_record[slice_point[i]]
         start = i * 3
-        a_s = subspace[start + 1]
-        w_s = subspace[start + 2]
+        a_s = subspace[start + 2]
+        w_s = subspace[start + 1]
         layer_quant_params = []
         quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
 
@@ -232,6 +232,22 @@ def parse_quant_dr_rollout(subspace, rollout_record):
         quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
         rollout_output.append(subspace[start][op_choice])
         rollout_output += quant_params
+        """
+        op_choice = rollout_record[slice_point[i]]
+        start = i * 3
+        a_s = subspace[start + 1]
+        w_s = subspace[start + 2]
+        layer_quant_params = []
+        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+
+        for w in range(len(w_s)):
+            for a in range(len(a_s)):
+                new_quant = [a_s[a][0], a_s[a][1], w_s[w][0], w_s[w][1]]
+                layer_quant_params.append(new_quant)
+        quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
+        rollout_output.append(subspace[start][op_choice])
+        rollout_output += quant_params
+        """
     
     
     return rollout_output
@@ -326,16 +342,55 @@ if __name__ == "__main__":
         [1, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 1, 0, 0, 2, 3, 0, 0, 0, 1, 0, 1, 2, 2, 0, 0, 0, 1, 2, 0, 1, 2, 0, 0, 0, 1, 1, 0, 2], # ep 53 47.39
         [1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 2, 1, 1, 1, 0, 0, 0, 1, 2, 1, 2, 0, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0]  # ep 72 34.5
         ]
+    
+    # >>> o1297376 e20 ep 80
+    q_rollouts = [
+        [0, 0, 0, 0, 1, 2, 1, 2, 1, 0, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 1, 0, 2, 1, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 1, 2, 1, 1], # ep 00 73.54
+        [0, 0, 0, 0, 0, 2, 0, 2, 1, 0, 0, 0, 1, 1, 1, 2, 3, 0, 0, 0, 1, 1, 0, 2, 1, 0, 0, 0, 1, 1, 0, 1, 3, 0, 0, 0, 0, 1, 0, 1, 3, 0, 0, 0, 1, 2, 0, 2], # ep 61 72.88
+        [2, 0, 0, 0, 1, 2, 1, 2, 1, 0, 0, 0, 1, 1, 0, 1, 3, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 2, 1, 1, 3, 0, 0, 0, 0, 0, 1, 1, 3, 0, 0, 0, 1, 2, 1, 2], # ep 47 72.21
+        [0, 0, 0, 0, 1, 2, 1, 2, 1, 0, 0, 0, 1, 2, 0, 2, 2, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2], # ep 67 72.10
+        [2, 0, 0, 0, 1, 2, 1, 2, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 1, 1, 1, 3, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1]  # ep 70 71.77
+    ]
 
+    # >>> o1297361 e30 ep 80
+    # q_rollouts = [
+    #     [1, 0, 0, 0, 1, 0, 0, 2, 1, 0, 0, 0, 1, 0, 1, 2, 2, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 0, 1, 0, 0, 2, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 2], # ep 61 71.53
+    #     [1, 0, 0, 0, 0, 2, 1, 1, 1, 0, 0, 0, 1, 2, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 1, 1, 0, 2, 1, 0, 0, 0, 1, 1, 1, 1], # ep 66 64.32
+    #     [1, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 1, 2, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 3, 0, 0, 0, 0, 2, 0, 2, 2, 0, 0, 0, 0, 0, 1, 1], # ep 40 61.91
+    #     [1, 0, 0, 0, 0, 0, 0, 2, 3, 0, 0, 0, 1, 1, 1, 1, 2, 0, 0, 0, 1, 2, 0, 1, 1, 0, 0, 0, 1, 0, 1, 2, 1, 0, 0, 0, 1, 2, 0, 2, 3, 0, 0, 0, 0, 1, 1, 2], # ep 31 61.81
+    #     [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 1, 1, 0, 1, 3, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1], # ep 07 60.59 
+    # ]
 
     size = 2
     WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
     subspace = clear_recurse(WS)
     print(subspace)
     print(len(subspace))
+
+    size = 3
+    WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
+    subspace = clear_recurse(WS)
+    print(subspace)
+    print(len(subspace))
+
+    size = 4
+    WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
+    subspace = clear_recurse(WS)
+    print(subspace)
+    print(len(subspace))
+
+    size = 5
+    WS, WSSize = working_set(q_rollouts[:size], size, quant = True)
+    subspace = clear_recurse(WS)
+    print(subspace)
+    print(len(subspace))
+
     # rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
-    rollout_record = [1, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
-    # rollout_record = [0, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
+    # rollout_record = [1, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
+    rollout_record = [1, 3, 0, 2, 0, 3, 5, 2, 0, 3, 3, 1, 4, 6, 0, 1, 2, 2, 0, 2, 4, 3]
+    rollout_record = [0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 3, 0, 3, 0, 1, 0, 3]
+    # rollout_record = [0, 1, 0, 1, 0, 1, 0, 0, 1, 3, 5, 1, 0, 0, 1, 4, 3, 3]
+    # rollout_record = [0, 9, 0, 1, 0, 4, 5, 2, 1, 1, 5, 1, 4, 1, 1, 4, 3, 0, 7, 7, 6, 3]
     rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
     print(rollout_output)
 

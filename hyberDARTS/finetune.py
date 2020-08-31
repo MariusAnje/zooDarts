@@ -238,17 +238,27 @@ if __name__ == "__main__":
                1, 1, 2, 1, 2,
                1, 1, 2, 1, 2,
                1, 1, 2, 1, 2,
-               1, 1, 2, 1, 2,] # best 
+               1, 1, 2, 1, 2,] # best 91.79
     
-    rollout = [3, 1, 2, 1, 2,
-               3, 1, 2, 1, 2,
-               3, 1, 2, 1, 2,
-               3, 1, 2, 1, 2,
-               3, 1, 2, 1, 2,
-               3, 1, 2, 1, 2,] # largest 
+    # rollout = [3, 1, 2, 1, 2,
+    #            3, 1, 2, 1, 2,
+    #            3, 1, 2, 1, 2,
+    #            3, 1, 2, 1, 2,
+    #            3, 1, 2, 1, 2,
+    #            3, 1, 2, 1, 2,] # largest 89.91
+    
+    # rollout = [2, 1, 2, 0, 2, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 3, 0, 2, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1] # RL o1297379 (e10) ep 77 78.76
+    rollout = [2, 1, 2, 1, 2, 3, 0, 2, 1, 2, 2, 1, 0, 1, 1, 3, 1, 1, 1, 2, 1, 1, 2, 0, 2, 3, 0, 2, 0, 1] # 21 darts ep 80 e 10 top 4 size 4 quant 2 87.87
+    rollout = [2, 1, 2, 0, 2, 1, 0, 1, 1, 2, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 0, 2, 0, 2, 0, 0, 2, 0, 1] # 21 darts ep 80 e 10 top 2 size 2 quant 2 85.80
+    rollout = [2, 1, 2, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 3, 1, 1, 1, 1, 2, 1, 0, 0, 1, 3, 0, 2, 0, 2] # 21 darts ep 80 e 10 top 3 size 3 quant 2 88.99
+    rollout = [1, 1, 1, 1, 2, 2, 0, 2, 1, 1, 2, 0, 2, 1, 1, 3, 1, 2, 0, 2, 2, 1, 0, 0, 2, 0, 1, 2, 0, 2] # 21 darts ep 80 e 10 top 4 size 4 quant 2 90.32
+
+    rollout = [1, 0, 0, 0, 2, 2, 0, 1, 1, 2, 2, 1, 0, 1, 1, 3, 1, 0, 1, 2, 2, 1, 2, 0, 2, 0, 1, 2, 0, 2] # 12 aw darts ep 80 e 10 top 4 size 4 quant 2 87.05
+    # rollout = [2, 0, 1, 1, 2, 1, 0, 2, 0, 1, 1, 0, 1, 1, 1, 3, 0, 2, 0, 2, 2, 1, 0, 0, 1, 3, 0, 1, 0, 2] # 12 aw darts ep 80 e 10 top 3 size 3 quant 2 82.28
+    # rollout = [2, 0, 1, 1, 2, 1, 0, 1, 1, 2, 1, 0, 1, 1, 1, 2, 0, 2, 0, 2, 1, 0, 2, 0, 2, 0, 0, 2, 0, 1] # 12 aw darts ep 80 e 10 top 2 size 2 quant 2 77.88
 
     print("Rollout:", rollout)
-    print("21 darts ep 30 e 10 top 2 size 2 quant 2 ")
+    print("12 aw darts ep 80 e 10 top 4 size 4 quant 2")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))
