@@ -257,8 +257,21 @@ if __name__ == "__main__":
     # rollout = [2, 0, 1, 1, 2, 1, 0, 2, 0, 1, 1, 0, 1, 1, 1, 3, 0, 2, 0, 2, 2, 1, 0, 0, 1, 3, 0, 1, 0, 2] # 12 aw darts ep 80 e 10 top 3 size 3 quant 2 82.28
     # rollout = [2, 0, 1, 1, 2, 1, 0, 1, 1, 2, 1, 0, 1, 1, 1, 2, 0, 2, 0, 2, 1, 0, 2, 0, 2, 0, 0, 2, 0, 1] # 12 aw darts ep 80 e 10 top 2 size 2 quant 2 77.88
 
+    rollout = [0, 1, 2, 1, 2, 1, 0, 1, 1, 2, 2, 0, 1, 0, 2, 1, 1, 1, 1, 2, 0, 0, 2, 1, 1, 0, 1, 2, 1, 1] # o1297361 e20 ep 00 83.52
+    # 21 darts ep 80 e 20 top 2 size 2 quant 2 87.62
+    # 21 darts ep 80 e 20 top 3 size 3 quant 2 85.81
+    # 21 darts ep 80 e 20 top 4 size 4 quant 2 84.72
+    # 21 darts ep 80 e 20 top 5 size 5 quant 2 87.59
+
+    # rollout = [1, 1, 0, 0, 2, 1, 1, 0, 1, 2, 2, 0, 1, 1, 1, 2, 1, 0, 0, 2, 1, 1, 0, 0, 1, 1, 1, 1, 1, 2] # o1297361 e30 ep 61 90.42
+    # 21 darts ep 80 e 30 top 2 size 2 quant 2 90.6
+    # 21 darts ep 80 e 30 top 3 size 3 quant 3 72.33
+    # 21 darts ep 80 e 30 top 3 size 4 quant 4 90.51
+
+
+
     print("Rollout:", rollout)
-    print("12 aw darts ep 80 e 10 top 4 size 4 quant 2")
+    print("# o1297361 e20 ep 00")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))
