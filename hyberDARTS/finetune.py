@@ -21,6 +21,22 @@ sys.path.append('./RL')
 from darts.models import ChildCIFARNet, QuantChildCIFARNet
 from darts.modules import quantize
 
+def clear_rollouts(record, quant = True):
+    if quant:
+        usefulList = [0, 8, 16, 24, 32, 40]
+        usefulRecord = []
+        for j in usefulList:
+            usefulRecord.append(record[j])
+            usefulRecord += record[j+4:j+6]
+            usefulRecord += record[j+6:j+8]
+        return usefulRecord
+    else:
+        usefulList = [0, 4, 8, 12, 16, 20]
+        usefulRecord = []
+        for j in usefulList:
+            usefulRecord.append(record[j])
+        return usefulRecord
+
 def train(device, loader, criterion, optimizer, model):
     model.train()
     running_loss = 0.0
@@ -268,10 +284,14 @@ if __name__ == "__main__":
     # 21 darts ep 80 e 30 top 3 size 3 quant 3 72.33
     # 21 darts ep 80 e 30 top 3 size 4 quant 4 90.51
 
+    # >>> o1297361 e30
+    rollout = [2, 1, 1, 0, 2, 1, 1, 2, 1, 1, 3, 1, 0, 1, 2, 1, 1, 1, 1, 2, 0, 1, 0, 0, 2, 3, 0, 2, 0, 1] # ep 25 82.33
+    rollout = [2, 0, 2, 1, 2, 0, 0, 2, 0, 2, 2, 1, 2, 0, 2, 1, 1, 1, 1, 2, 2, 1, 0, 0, 1, 2, 1, 0, 0, 0] # ep 05 45.09
+
 
 
     print("Rollout:", rollout)
-    print("# o1297361 e20 ep 00")
+    print("o1297361 e30 ep 05")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))
