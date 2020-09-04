@@ -80,10 +80,11 @@ def execute(rollout, trainLoader, testloader, epochs, device, quant):
         model = QuantChildCIFARNet(rollout)
     else:
         model = ChildCIFARNet(rollout)
-    print(model)
+    # print(model)
     model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-7, weight_decay=0, amsgrad=False)
     # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     # optimizer = optim.SGD( model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4, nesterov=True)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
@@ -125,7 +126,10 @@ def main(device, rollout, epochs, args, quant = False):
 
     trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batchSize, shuffle=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batchSize, shuffle=False, num_workers=4)
-    best_acc = execute(rollout, trainLoader, testloader, epochs, device, quant)
+    for _ in range(5):
+        best_acc = execute(rollout, trainLoader, testloader, epochs, device, quant)
+        if best_acc > 0.15:
+            break
     return best_acc
     
     
@@ -281,17 +285,48 @@ if __name__ == "__main__":
 
     # rollout = [1, 1, 0, 0, 2, 1, 1, 0, 1, 2, 2, 0, 1, 1, 1, 2, 1, 0, 0, 2, 1, 1, 0, 0, 1, 1, 1, 1, 1, 2] # o1297361 e30 ep 61 90.42
     # 21 darts ep 80 e 30 top 2 size 2 quant 2 90.6
-    # 21 darts ep 80 e 30 top 3 size 3 quant 3 72.33
-    # 21 darts ep 80 e 30 top 3 size 4 quant 4 90.51
+    # 21 darts ep 80 e 30 top 3 size 3 quant 2 72.33
+    # 21 darts ep 80 e 30 top 3 size 4 quant 2 90.51
 
-    # >>> o1297361 e30
+    # >>> o1297362 e30
     rollout = [2, 1, 1, 0, 2, 1, 1, 2, 1, 1, 3, 1, 0, 1, 2, 1, 1, 1, 1, 2, 0, 1, 0, 0, 2, 3, 0, 2, 0, 1] # ep 25 82.33
+    rollout = [2, 1, 1, 1, 1, 1, 0, 0, 0, 2, 2, 0, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 0, 1, 2, 2, 1, 1, 0, 0] # ep 10 e 30 size 3
+    rollout = [2, 0, 2, 1, 1, 1, 1, 0, 0, 2, 2, 0, 0, 0, 2, 1, 1, 1, 1, 1, 3, 1, 0, 1, 1, 2, 1, 1, 0, 0] # ep 10 e 30 size 3 aw
+    # rollout = [0, 0, 2, 1, 1, 1, 0, 2, 1, 1, 2, 1, 2, 0, 2, 1, 0, 0, 1, 1, 2, 1, 0, 1, 1, 2, 1, 0, 0, 0] # ep 20 e 30 size 3
+    # rollout = [0, 1, 1, 0, 2, 1, 0, 0, 0, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 0, 1, 1, 2, 0, 2, 1, 2] # ep 20 e 30 size 3 aw 87.03
+    # rollout = [1, 1, 1, 1, 2, 0, 0, 2, 0, 2, 3, 1, 2, 1, 2, 1, 0, 0, 0, 2, 2, 1, 0, 0, 1, 1, 0, 2, 1, 0] # ep 40 e 30 size 4
+    # rollout = [1, 0, 2, 0, 2, 0, 0, 0, 1, 1, 3, 1, 2, 1, 2, 1, 0, 0, 1, 1, 2, 1, 0, 1, 1, 1, 1, 0, 1, 2] # ep 40 e 30 size 4 aw 85.13
+    # rollout = [2, 0, 2, 1, 2, 1, 0, 0, 0, 2, 3, 1, 0, 0, 1, 2, 1, 1, 1, 1, 2, 1, 2, 0, 2, 1, 0, 1, 0, 0] # ep 80 e 30 size 4
+    # rollout = [2, 1, 1, 0, 2, 1, 0, 1, 0, 2, 3, 1, 1, 0, 1, 2, 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 0, 2, 0, 1] # ep 80 e 30 size 4 aw 89.53
+    # 21 darts ep 120 e 30 top 3 size 4 quant 4 88.76
+     
     rollout = [2, 0, 2, 1, 2, 0, 0, 2, 0, 2, 2, 1, 2, 0, 2, 1, 1, 1, 1, 2, 2, 1, 0, 0, 1, 2, 1, 0, 0, 0] # ep 05 45.09
 
+    # >>> o1297378 e 10
+    # 21 darts ep 040 e 10 size 4 quant 2 89.65
+    # 21 darts ep 080 e 10 size 4 quant 2 83.83
+    # 21 darts ep 120 e 10 size 4 quant 2 84.76
+
+    rollout = [0, 0, 2, 1, 1, 2, 1, 2, 0, 2, 0, 1, 1, 1, 2, 0, 1, 1, 1, 1, 1, 1, 2, 0, 1, 3, 1, 0, 0, 1] # ep 116
+    rollout = [2, 0, 1, 1, 1, 0, 1, 2, 1, 2, 1, 0, 1, 1, 2, 1, 1, 1, 0, 1, 2, 1, 2, 0, 1, 1, 0, 0, 0, 2] # ep 053
+    rollout = [1, 0, 1, 1, 2, 1, 1, 1, 1, 2, 0, 0, 0, 1, 2, 0, 1, 2, 1, 2, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1] # ep 005
+
+    # rollout = [0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 2, 0, 1, 2, 1, 1, 1, 1, 2, 0, 2, 0, 1, 0, 0, 2] # 21 darts ep 120 e 10 size 4 quant 2
+    # rollout = [0, 0, 2, 0, 2, 0, 1, 1, 0, 2, 0, 1, 2, 0, 2, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1] # 21 darts ep 120 e 10 size 4 quant 2 aw
+    # rollout = [0, 0, 0, 0, 1, 2, 1, 1, 0, 0, 1, 0, 1, 0, 2, 3, 1, 2, 0, 1, 2, 1, 2, 1, 1, 0, 0, 1, 1, 1] # 21 darts ep 080 e 10 size 4 quant 2
+    # rollout = [0, 0, 1, 1, 1, 2, 1, 0, 0, 2, 1, 0, 0, 1, 2, 3, 0, 2, 1, 2, 2, 1, 0, 0, 1, 0, 1, 0, 0, 1] # 21 darts ep 080 e 10 size 4 quant 2 aw
+    # rollout = [3, 0, 1, 1, 2, 1, 1, 2, 1, 1, 1, 0, 0, 0, 1, 0, 1, 2, 1, 0, 1, 1, 2, 0, 1, 2, 0, 1, 1, 2] # 21 darts ep 040 e 10 size 4 quant 2
+    # rollout = [3, 0, 1, 1, 2, 1, 1, 2, 0, 2, 1, 1, 2, 0, 1, 0, 1, 0, 1, 2, 1, 1, 2, 0, 1, 2, 0, 1, 1, 2] # 21 darts ep 040 e 10 size 4 quant 2 aw
+    # rollout = [3, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 0, 0, 1, 1, 2, 1, 0, 0, 1, 2, 0, 2, 0, 1, 2, 1, 0] # 21 darts ep 030 e 10 size 4 quant 2
+    # rollout = [3, 1, 2, 1, 1, 2, 1, 2, 0, 2, 1, 0, 0, 1, 2, 1, 1, 0, 1, 2, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1] # 21 darts ep 030 e 10 size 4 quant 2 aw
+    # rollout = [3, 1, 2, 1, 2, 1, 1, 1, 0, 2, 1, 1, 2, 1, 2, 0, 0, 0, 1, 1, 1, 1, 2, 1, 0, 2, 0, 1, 0, 1] # 21 darts ep 020 e 10 size 4 quant 2
+    # rollout = [3, 0, 0, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 0, 1, 0, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0, 1, 2] # 21 darts ep 020 e 10 size 4 quant 2 aw
+    # rollout = [3, 1, 2, 1, 1, 1, 1, 2, 0, 0, 2, 1, 1, 0, 0, 1, 0, 0, 1, 1, 3, 1, 1, 0, 2, 0, 0, 1, 1, 2] # 21 darts ep 010 e 10 size 4 quant 2
+    # rollout = [3, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 1, 0, 0, 2, 3, 1, 1, 0, 2, 0, 0, 1, 1, 2] # 21 darts ep 010 e 10 size 4 quant 2 aw
 
 
-    print("Rollout:", rollout)
-    print("o1297361 e30 ep 05")
+    print("rollout: ", rollout)
+    print("o1297378 # ep 005")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     # print("Best accuracy", main(device, rollout,  10, args, True))
     print("Best accuracy", main(device, rollout, args.epochs, args, True))

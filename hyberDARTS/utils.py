@@ -170,7 +170,7 @@ def accuracy_analysis(fn:str, ep:int, th:int=4000):
         final_subspace.append(item[0])
     return final_subspace
 
-def parse_quant_dr_rollout(subspace, rollout_record):
+def parse_quant_dr_rollout(subspace, rollout_record, aw = False):
     rollout = [0 for i in range(len(subspace))]
 
     """
@@ -208,6 +208,7 @@ def parse_quant_dr_rollout(subspace, rollout_record):
     """
         These are for quant space of 2
     """
+    
     slice_point = [0]
     slice_zie   = []
     for i in range(0,len(subspace),3):
@@ -216,40 +217,39 @@ def parse_quant_dr_rollout(subspace, rollout_record):
         slice_point.append(slice_zie[i] + slice_point[i])
 
     rollout_output = []
+    if not aw:
+        for i in range(len(slice_zie)):
+            op_choice = rollout_record[slice_point[i]]
+            start = i * 3
+            a_s = subspace[start + 2]
+            w_s = subspace[start + 1]
+            layer_quant_params = []
+            quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
 
-    for i in range(len(slice_zie)):
-        op_choice = rollout_record[slice_point[i]]
-        start = i * 3
-        a_s = subspace[start + 2]
-        w_s = subspace[start + 1]
-        layer_quant_params = []
-        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+            for w in range(len(w_s)):
+                for a in range(len(a_s)):
+                    new_quant = [w_s[w][0], w_s[w][1], a_s[a][0], a_s[a][1]]
+                    layer_quant_params.append(new_quant)
+            quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
+            rollout_output.append(subspace[start][op_choice])
+            rollout_output += quant_params
+    else:
+        for i in range(len(slice_zie)):
+            op_choice = rollout_record[slice_point[i]]
+            start = i * 3
+            a_s = subspace[start + 1]
+            w_s = subspace[start + 2]
+            layer_quant_params = []
+            quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
 
-        for w in range(len(w_s)):
-            for a in range(len(a_s)):
-                new_quant = [w_s[w][0], w_s[w][1], a_s[a][0], a_s[a][1]]
-                layer_quant_params.append(new_quant)
-        quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
-        rollout_output.append(subspace[start][op_choice])
-        rollout_output += quant_params
-        """
-        op_choice = rollout_record[slice_point[i]]
-        start = i * 3
-        a_s = subspace[start + 1]
-        w_s = subspace[start + 2]
-        layer_quant_params = []
-        quant_keys = ['weight_num_int_bits','weight_num_frac_bits', 'act_num_int_bits', 'act_num_frac_bits']
+            for w in range(len(w_s)):
+                for a in range(len(a_s)):
+                    new_quant = [a_s[a][0], a_s[a][1], w_s[w][0], w_s[w][1]]
+                    layer_quant_params.append(new_quant)
+            quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
+            rollout_output.append(subspace[start][op_choice])
+            rollout_output += quant_params
 
-        for w in range(len(w_s)):
-            for a in range(len(a_s)):
-                new_quant = [a_s[a][0], a_s[a][1], w_s[w][0], w_s[w][1]]
-                layer_quant_params.append(new_quant)
-        quant_params = layer_quant_params[rollout_record[slice_point[i] + op_choice + 1]]
-        rollout_output.append(subspace[start][op_choice])
-        rollout_output += quant_params
-        """
-    
-    
     return rollout_output
 
 if __name__ == "__main__":
@@ -497,12 +497,67 @@ if __name__ == "__main__":
     print(subspace)
     print(len(subspace))
 
-    # rollout_record = [0, 3, 1, 2, 2, 2, 0, 0, 0, 0, 2, 1, 1, 1, 0, 2, 2, 2, 1, 1, 0, 1, 3]
-    # rollout_record = [1, 1, 1, 0, 3, 3, 1, 2, 2, 0, 1, 1, 0, 0, 0, 0, 1, 3, 3]
-    rollout_record = [1, 3, 0, 2, 0, 3, 5, 2, 0, 3, 3, 1, 4, 6, 0, 1, 2, 2, 0, 2, 4, 3]
-    rollout_record = [0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 3, 0, 3, 0, 1, 0, 3]
-    # rollout_record = [0, 1, 0, 1, 0, 1, 0, 0, 1, 3, 5, 1, 0, 0, 1, 4, 3, 3]
-    # rollout_record = [0, 9, 0, 1, 0, 4, 5, 2, 1, 1, 5, 1, 4, 1, 1, 4, 3, 0, 7, 7, 6, 3]
+    print("120")
+    subspace = [[0, 1, 2], [(0, 1), (0, 2)], [(0, 2), (1, 1)], [0, 2], [(1, 2), (1, 1)], [(0, 1), (0, 2), (1, 2)], [0, 1, 2], [(1, 2), (0, 1), (1, 1)], [(1, 2), (1, 1), (0, 2)], [0, 1, 3], [(1, 2), (1, 0), (1, 1)], [(0, 1), (0, 2), (1, 1)], [1, 2, 3], [(1, 2), (0, 1)], [(0, 1), (0, 2)], [0, 1, 2, 3], [(1, 0), (0, 0)], [(0, 1), (1, 1), (0, 2)]]
+    rollout_record = [0, 1, 1, 1, 0, 3, 3, 0, 6, 1, 7, 0, 2, 8, 8, 0, 1, 1, 3, 0, 2, 1, 0, 0, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+
+    print("80")
+    subspace = [[0, 1], [(0, 1), (0, 0)], [(1, 2), (1, 0), (0, 1), (1, 1)], [0, 1, 2], [(1, 2), (1, 0), (1, 1)], [(1, 2), (0, 0), (0, 2)], [0, 1, 3], [(0, 1), (0, 0)], [(1, 2), (0, 2)], [0, 2, 3], [(1, 2), (0, 2), (1, 1)], [(1, 2), (0, 1), (0, 2)], [1, 2, 3], [(1, 2), (1, 0), (1, 1)], [(0, 1), (1, 1), (1, 2)], [0, 1], [(0, 1), (1, 0), (0, 0)], [(0, 1), (1, 1), (1, 2)]]
+    rollout_record = [0, 6, 1, 2, 1, 3, 7, 1, 3, 1, 1, 2, 1, 2, 1, 1, 6, 1, 3, 0, 1, 1, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+
+    print("40")
+    subspace = [[1, 3], [(0, 1), (1, 0), (0, 0), (1, 2)], [(1, 2), (1, 1)], [1, 2], [(1, 2), (0, 2), (1, 1)], [(1, 2), (0, 2), (0, 0), (1, 1)], [0, 1, 2], [(1, 2), (0, 0), (1, 1)], [(1, 2), (0, 0), (0, 1), (1, 1)], [0, 1], [(1, 2), (1, 0), (0, 0)], [(1, 2), (1, 0), (1, 1), (0, 2)], [0, 1, 3], [(1, 2), (0, 2), (1, 1)], [(0, 1), (1, 0), (0, 2)], [0, 2], [(1, 2), (1, 0), (0, 0), (0, 1)], [(0, 1), (1, 0), (1, 2)]]
+    rollout_record = [1, 2, 0, 0, 3, 9, 1, 1, 6, 11, 0, 1, 2, 1, 4, 0, 0, 1, 0, 11, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+
+    print("30")
+    subspace = [[1, 3], [(0, 1), (1, 0), (0, 0), (1, 2)], [(1, 2), (1, 1)], [1, 2], [(1, 2), (0, 2), (1, 1)], [(1, 2), (0, 2), (0, 0), (1, 1)], [0, 1, 2], [(1, 2), (0, 0), (1, 1)], [(1, 2), (0, 0), (0, 1), (1, 1)], [0, 1], [(1, 2), (1, 0), (0, 0)], [(1, 2), (1, 0), (1, 1), (0, 2)], [0, 1, 3], [(1, 2), (0, 2), (1, 1)], [(0, 1), (1, 0), (0, 2)], [0, 2], [(1, 2), (1, 0), (0, 0), (0, 1)], [(0, 1), (1, 0), (1, 2)]]
+    rollout_record = [1, 5, 7, 1, 0, 3, 1, 2, 1, 8, 1, 5, 1, 0, 2, 7, 7, 0, 1, 0, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+
+    print("20")
+    subspace = [[1, 3], [(0, 1), (1, 0), (0, 0), (1, 2)], [(1, 2), (1, 1)], [1, 2], [(1, 2), (0, 2), (1, 1)], [(1, 2), (0, 2), (0, 0), (1, 1)], [0, 1, 2], [(1, 2), (0, 0), (1, 1)], [(1, 2), (0, 0), (0, 1), (1, 1)], [0, 1], [(1, 2), (1, 0), (0, 0)], [(1, 2), (1, 0), (1, 1), (0, 2)], [0, 1, 3], [(1, 2), (0, 2), (1, 1)], [(0, 1), (1, 0), (0, 2)], [0, 2], [(1, 2), (1, 0), (0, 0), (0, 1)], [(0, 1), (1, 0), (1, 2)]]
+    rollout_record = [1, 0, 6, 0, 9, 1, 1, 1, 0, 10, 0, 10, 5, 1, 6, 1, 0, 1, 4, 9, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+
+    print("10")
+    subspace = [[1, 3], [(0, 1), (1, 0), (0, 0), (1, 2)], [(1, 2), (1, 1)], [1, 2], [(1, 2), (0, 2), (1, 1)], [(1, 2), (0, 2), (0, 0), (1, 1)], [0, 1, 2], [(1, 2), (0, 0), (1, 1)], [(1, 2), (0, 0), (0, 1), (1, 1)], [0, 1], [(1, 2), (1, 0), (0, 0)], [(1, 2), (1, 0), (1, 1), (0, 2)], [0, 1, 3], [(1, 2), (0, 2), (1, 1)], [(0, 1), (1, 0), (0, 2)], [0, 2], [(1, 2), (1, 0), (0, 0), (0, 1)], [(0, 1), (1, 0), (1, 2)]]
+    rollout_record = [1, 4, 7, 0, 2, 1, 2, 1, 8, 9, 1, 3, 10, 2, 5, 5, 8, 0, 11, 1, 3]
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, False)
+    print("Normal")
+    print(rollout_output)
+    print("AW")
+    rollout_output = parse_quant_dr_rollout(subspace, rollout_record, True)
+    print(rollout_output)
+    exit()
+
     rollout_output = parse_quant_dr_rollout(subspace, rollout_record)
     print(rollout_output)
 

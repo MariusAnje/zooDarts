@@ -628,6 +628,8 @@ def quant_darts_only(device, dir='experiment'):
     dr_rollout = q_darts(subspace, device)
     rollout_output = utils.parse_quant_dr_rollout(subspace, dr_rollout)
     print("DR best arch acc: ", finetune.main(device, rollout_output, 100, args, quant = True))
+    rollout_output = utils.parse_quant_dr_rollout(subspace, dr_rollout, aw = True)
+    print("DR best arch acc: ", finetune.main(device, rollout_output, 100, args, quant = True))
 
 SCRIPT = {
     'nas': nas,
