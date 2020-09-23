@@ -30,7 +30,7 @@ from RL import utility
 
 from darts import modules
 from darts.modules import SuperNet#, MixedBlock
-from darts.models import SubCIFARNet, ChildCIFARNet, SuperCIFARNet
+from darts.models import SubCIFARNet, ChildCIFARNet, SuperCIFARNet, QuantCIFARNet
 
 import utils
 import finetune
@@ -255,7 +255,7 @@ def darts_memory(subspaces, extra_info = ""):
                         level= logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s')
 
-    logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
+    # logging.info("=" * 45 + "\n" + " " * (20 + 33) + "Begin" +  " " * 20 + "\n" + " " * 33 + "=" * 45)
     
     gpu_list = []
     for i in range(4):
@@ -298,19 +298,19 @@ def darts_memory(subspaces, extra_info = ""):
     for the_gpu in gpu_list:
         size_record = []
         i = 0
+        the_gpu = 3
         print(f"GPU: {the_gpu}")
         for subspace in subspaces:
             # logging.debug("Creating model")
             superModel = SuperNet()
-            superModel.get_model(SubCIFARNet(subspace))
-            # superModel.get_model(SuperCIFARNet())
+            superModel.get_model(QuantCIFARNet(subspace))
             archParams = superModel.get_arch_params()
             netParams  = superModel.get_net_params()
             # Training optimizers
             archOptimizer = optim.Adam(archParams,lr = 0.1)
             netOptimizer  = optim.Adam(netParams, lr = 1e-3)
             criterion = nn.CrossEntropyLoss()
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
             # GPU or CPU
             
             superModel.to(device)
@@ -478,9 +478,21 @@ def nas(device, dir='experiment'):
     # return rollout_record, best_samples.rollout_list[0]
 
 def memory(device, dir='experiment'):
-    subspaces = generate_subspaces(args.size)
+    # subspaces = generate_subspaces(args.size)
     # subspaces = [subspaces[3]]  * 100
-    darts_memory(subspaces)
+    subspaces = [
+        [[1, 2], [(1, 2), (1, 0), (1, 1)], [(1, 2), (0, 1), (0, 2)], [1, 2, 3], [(1, 2), (1, 1)], [(0, 1), (1, 1), (1, 2)], [0, 1, 2], [(1, 2), (0, 1), (1, 1)], [(0, 1), (1, 1), (0, 2)], [0, 1, 2], [(0, 1), (1, 0), (1, 1)], [(0, 1), (0, 2), (1, 1)], [0, 2], [(0, 1), (0, 0), (1, 2)], [(1, 2), (0, 2)], [0, 1], [(0, 0), (1, 1)], [(1, 2), (0, 2)]],
+        [[0,1,2, 3], [(0, 1), (1, 0), (1, 1)], [(1, 2), (0, 2)], [0,1, 2, 3], [(1, 2), (1, 1)], [(0, 1), (1, 1), (1, 2)], [0, 1, 2,3], [(1, 2), (1, 0), (1, 1)], [(0, 1), (0, 2)], [0, 1, 2,3], [(1, 2), (1, 0), (1, 1)], [(0, 1), (0, 2), (1, 1)], [0, 1,2,3], [(0, 1), (1, 2)], [(1, 2), (0, 2)], [0, 1, 2, 3], [(0, 0), (1, 1)], [(1, 2), (0, 0), (0, 2)]],
+        [[1, 2], [(1, 2), (1, 0), (1, 1)], [(1, 2), (0, 1), (0, 2)], [1, 2, 3], [(1, 2), (1, 1)], [(0, 1), (1, 1), (1, 2)], [0, 1, 2], [(1, 2), (0, 1), (1, 1)], [(0, 1), (1, 1), (0, 2)], [0, 1, 2], [(0, 1), (1, 0), (1, 1)], [(0, 1), (0, 2), (1, 1)], [0, 2], [(0, 1), (0, 0), (1, 2)], [(1, 2), (0, 2)], [0, 1], [(0, 0), (1, 1)], [(1, 2), (0, 2)]],
+    ] # ep 10, size 4 --> 8547 MB
+
+    for subspace in subspaces:
+        try:
+            darts_memory([subspace])
+            with torch.cuda.device("cuda:{args.gpu}"):
+                torch.cuda.empty_cache()
+        except:
+            print("OOM")
 
 def from_trace(device, dir='experiment'):
     th_list = [2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000]

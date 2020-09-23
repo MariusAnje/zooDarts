@@ -16,7 +16,7 @@ module load pytorch
 # python -u main.py darts -ns -e 1 -ep 1 --train_epochs 1 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2 --ex_info "darts test"
 # python -u main.py darts -ns -e 30 -ep 50 --train_epochs 60 --rollout_filename ./experiment/rollout_record_e_30_ep_80_2 --method comp --wsSize 4
 
-python -u main.py quantization -ns -e 10 -ep 50 --train_epochs 15 --rollout_filename ./RLDR_S_RL.o1309380 --method comp --wsSize 3 -b 128
+python -u main.py quantization -ns -e 10 -ep 10 --train_epochs 15 --rollout_filename "./RLDR_S_RL.o1319375, BEFORE, " --method comp --wsSize 3 -b 128
 
 # python -u main.py joint  -ns -e 5 -ep 50 --train_epochs 30 --augment
 # python -u finetune.py
