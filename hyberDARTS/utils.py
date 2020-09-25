@@ -123,6 +123,18 @@ def stored_fm(subspace:list, channel_size:list, linear_size:list, fm_size:list):
         linear_fm += linear_size[i+1]
     return conv_fm + linear_fm
 
+def flops(rollout:list, channel_size:list, linear_size:list, fm_size:list):
+    conv_params = 0
+    stride = len(rollout) // len(fm_size)
+    ops = 0
+    for i in range(len(fm_size)):
+        start = i * stride
+        ks = rollout[start] * 2 + 1
+        a_bits = rollout[start+1] + rollout[start+2]
+        w_bits = rollout[start+3] + rollout[start+4]
+        ops += ks * ks * fm_size[i] * fm_size[i] * channel_size[i] * channel_size[i+1] * a_bits * w_bits
+    return ops
+
 def memory_size(subspace:list):
     # a = 0.0000792633
     a = 0.000082
