@@ -250,6 +250,10 @@ def sync_search(device, dir='experiment'):
         rollout, paras = agent.rollout()
         logger.info("Sample Architecture ID: {}, Sampled actions: {}".format(
                     child_id, rollout))
+
+        NFlops = utils.flops(utils.RL2DR_rollout(rollout, True), flops_channel_size, flops_linear_size, flops_fm_size)
+        NNFlops = np.log(NFlops) / 20.5
+
         arch_paras, quan_paras = utility.split_paras(paras)
         fpga_model = FPGAModel(rLUT=args.rLUT, rThroughput=args.rThroughput,
                                arch_paras=arch_paras, quan_paras=quan_paras)
@@ -263,8 +267,9 @@ def sync_search(device, dir='experiment'):
         else:
             reward = 0
 
-        NFlops = utils.flops(utils.RL2DR_rollout(rollout), flops_channel_size, flops_linear_size, flops_fm_size)
-        print(NFlops)
+        print(f"acc: {reward}, Flops: {NFlops}")
+        reward = reward + 1 - (NFlops / 4e9)
+
         agent.store_rollout(rollout, reward)
         end = time.time()
         ep_time = end - start
