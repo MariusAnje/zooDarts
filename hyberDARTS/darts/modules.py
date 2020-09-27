@@ -9,10 +9,10 @@ import sys
 import numpy as np
 import os
 
-if os.path.expanduser("~").find("afs") == -1:
-    GETTQDM = False
-else:
+if os.path.expanduser("~").find("afs") != -1 or os.name == "nt":
     GETTQDM = True
+else:
+    GETTQDM = False
 
 if GETTQDM:
     from tqdm import tqdm
@@ -35,10 +35,13 @@ else:
             return next(self.x)
 
 def n_para(module:nn.Module, input_size:torch.Size):
+    q_w = module.quant_weight.N
+    q_a = module.quant_act.N
+    module = module.op
     ic = module.in_channels
     oc = module.out_channels
     ks = module.kernel_size
-    return ic * oc * ks[0] * ks[1] * input_size[-1] * input_size[-2]
+    return ic * oc * ks[0] * ks[1] * input_size[-1] * input_size[-2] * q_w * q_a
 
 def quantize(x, num_int_bits, num_frac_bits, signed=True):
     precision = 1 / 2 ** num_frac_bits
@@ -155,7 +158,7 @@ class QuantBlock(nn.Module):
             get the latency of this block from HW registers
         """
 
-        return HW.get_latency(name, self.op, self.input_size)
+        return HW.get_latency(name, self, self.input_size)
     
     def forward(self, x):
         if self.input_size is None:
@@ -208,9 +211,10 @@ class MixedHW(nn.Module):
         """
             TODO: replace this random HW by functions
         """
-        self.HW = np.random.randn(num)
-        self.HW = self.HW - self.HW.min()
-        self.HW = (self.HW/self.HW.max()) + 1
+        # self.HW = np.random.randn(num)
+        self.HW = np.ones(num)
+        # self.HW = self.HW - self.HW.min()
+        # self.HW = (self.HW/self.HW.max()) + 1
     
     def init_latency(self, name, module, input_size):
         """
@@ -219,7 +223,7 @@ class MixedHW(nn.Module):
         """
         latencyItem = np.zeros(len(self.mix))
         for i in range(len(self.mix)):
-            latencyItem[i] = self.HW[i] * n_para(module, input_size) # TODO: replace random HW by functions
+            latencyItem[i] = self.HW[i] * n_para(module, input_size) #* module.quant_weight[0] * module.quant_act[0] # TODO: replace random HW by functions
         self.latency[name] = latencyItem
     
     def get_latency(self, name, module, input_size):
@@ -363,7 +367,7 @@ class SuperNet(nn.Module):
             returns a scaler
         """
         alpha = 0.1
-        beta = 0
+        beta = 1
         # print(self.get_latency())
         # print(self.get_latency().log())
         # exit()
